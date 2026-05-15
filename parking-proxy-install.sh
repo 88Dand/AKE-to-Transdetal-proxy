@@ -788,6 +788,7 @@ package main
 import (
     "fmt"
     "sync"
+	"time"
 
     "github.com/rs/zerolog/log"
 )
@@ -858,7 +859,7 @@ func (p *Processor) Process(data []SpaceInfo, cfg *Config) (map[string]TablePayl
             Type:    "strs",
             Version: 1,
             Pattern: t.Pattern,
-            IsDay:   isDaytime,
+            IsDay:   isDaytime(),
         }
         
         hasAnyRow := false
@@ -938,10 +939,6 @@ func (p *Processor) Process(data []SpaceInfo, cfg *Config) (map[string]TablePayl
     return result, changed
 }
 
-func isDaytime() bool {
-    now := time.Now()
-    return now.Hour() >= 7 && now.Hour() < 18
-}
 
 func countFree(zoneFree, floorFree map[string]int, zones, floors []string) int {
     count := 0
@@ -1113,10 +1110,6 @@ func (s *Service) tick(ctx context.Context, forceSend bool) {
         return
     }
     s.fetchErrors = 0
-
-    s.dayMu.RLock()
-    currentDayState := s.isDay
-    s.dayMu.RUnlock()
 
     payloads, changed := s.processor.Process(data, s.cfg)
     if !changed && !forceSend { return }

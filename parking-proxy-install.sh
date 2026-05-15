@@ -328,10 +328,6 @@ import (
     "syscall"
     "time"
 
-    "parking-proxy/internal/config"
-    "parking-proxy/internal/service"
-    "parking-proxy/internal/web"
-
     "github.com/rs/zerolog"
     "github.com/rs/zerolog/log"
 )
@@ -779,8 +775,6 @@ package processor
 
 import (
     "fmt"
-    "parking-proxy/internal/config"
-    "parking-proxy/internal/fetcher"
     "sync"
 
     "github.com/rs/zerolog/log"
@@ -959,7 +953,6 @@ import (
     "net/http"
     "time"
 
-    "parking-proxy/internal/processor"
     "github.com/rs/zerolog/log"
 )
 
@@ -1042,11 +1035,6 @@ package service
 
 import (
     "context"
-    "parking-proxy/internal/astro"
-    "parking-proxy/internal/config"
-    "parking-proxy/internal/fetcher"
-    "parking-proxy/internal/processor"
-    "parking-proxy/internal/sender"
     "sync"
     "time"
 
@@ -1167,9 +1155,6 @@ import (
     "os"
     "strings"
     "time"
-
-    "parking-proxy/internal/config"
-    "parking-proxy/internal/fetcher"
 
     "github.com/rs/zerolog/log"
 )

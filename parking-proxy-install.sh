@@ -1535,17 +1535,16 @@ func buildIndexHTML(cfg *Config) string {
                 var textElem = document.getElementById("table_" + i + "_row" + j + "_text");
                 var imgElem = document.getElementById("table_" + i + "_row" + j + "_img");
                 var textVal = textElem ? textElem.value.trim() : "";
+                var imgVal = imgElem ? imgElem.value : "";
                 
-                // Проверяем, есть ли выбранные чекбоксы для этой строки
                 var selectedZones = getCheckedValues(i, j, 'zone');
                 var selectedFloors = getCheckedValues(i, j, 'floor');
                 var hasSelection = selectedZones.length > 0 || selectedFloors.length > 0;
                 
-                // Отправляем строку только если есть выбранные чекбоксы И текст не пустой
                 if (hasSelection && textVal !== "") {
                     data["row" + j] = {
                         text: textVal,
-                        img: imgElem ? imgElem.value : ""
+                        img: imgVal
                     };
                     hasAnyRow = true;
                 }

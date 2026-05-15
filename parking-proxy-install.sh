@@ -1079,17 +1079,19 @@ func NewService(cfg *Config) *Service {
 }
 
 func (s *Service) Run(ctx context.Context) {
-
     log.Info().Str("mpgs_url", s.cfg.MPGS.BaseURL).Msg("Service started")
 
     go func() {
-        ticker := time.NewTicker(30 * time.Second)
-        defer ticker.Stop()
-        for range ticker.C {
+        t := time.NewTicker(30 * time.Second)
+        defer t.Stop()
+        for range t.C {
             s.tick(ctx, true)
         }
     }()
-	
+
+    ticker := time.NewTicker(2 * time.Second)
+    defer ticker.Stop()
+
     for {
         select {
         case <-ctx.Done():

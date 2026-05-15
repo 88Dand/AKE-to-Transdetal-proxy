@@ -1927,7 +1927,7 @@ func (ws *WebServer) handleSaveConfig(w http.ResponseWriter, r *http.Request) {
         respondJSON(w, map[string]interface{}{"error": "Write: " + err.Error()})
         return
     }
-    
+
     go func() {
         time.Sleep(1 * time.Second)
         cfg := Get()
@@ -1935,19 +1935,19 @@ func (ws *WebServer) handleSaveConfig(w http.ResponseWriter, r *http.Request) {
             log.Error().Msg("Config not loaded after save")
             return
         }
-        
+
         f := NewMPGSFetcher(cfg.MPGS.BaseURL, cfg.MPGS.Key, cfg.MPGS.Secret, cfg.MPGS.Version, cfg.MPGS.Timeout)
         ctx, cancel := context.WithTimeout(context.Background(), time.Duration(cfg.MPGS.Timeout)*time.Second)
         defer cancel()
-        
+
         spaces, err := f.Fetch(ctx)
         if err != nil {
             log.Error().Err(err).Msg("MPGS fetch after config save failed")
             return
         }
-        
+
         log.Info().Int("spaces", len(spaces)).Msg("MPGS fetched after config save, sending to tables...")
-        
+
         zoneFree := make(map[string]int)
         floorFree := make(map[string]int)
         for _, s := range spaces {
@@ -1955,18 +1955,18 @@ func (ws *WebServer) handleSaveConfig(w http.ResponseWriter, r *http.Request) {
                 zone := s.BelongArea
                 if zone == "" { zone = "unknown" }
                 zoneFree[zone]++
-                
+
                 floor := s.MapName
                 if floor == "" { floor = "unknown" }
                 floorFree[floor]++
             }
         }
-        
+
         for _, table := range cfg.Tables {
             if table.Mode != "push" {
                 continue
             }
-            
+
             payload := map[string]interface{}{
                 "type":     "strs",
                 "version":  1,
@@ -1974,52 +1974,32 @@ func (ws *WebServer) handleSaveConfig(w http.ResponseWriter, r *http.Request) {
                 "pattern":  0,
                 "is_day":   true,
             }
-            
-            if table.Row1 != nil {
-                cnt := 0
-                if len(table.Row1.Zones) > 0 || len(table.Row1.Floors) > 0 {
-                    cnt = countFree(zoneFree, floorFree, table.Row1.Zones, table.Row1.Floors)
-                } else {
-                    for _, v := range zoneFree { cnt += v }
-                }
+
+            if table.Row1 != nil && (len(table.Row1.Zones) > 0 || len(table.Row1.Floors) > 0) {
+                cnt := countFree(zoneFree, floorFree, table.Row1.Zones, table.Row1.Floors)
                 payload["str1"] = map[string]string{"text": fmt.Sprintf("%d", cnt), "img": table.Row1.Img}
             }
-            if table.Row2 != nil {
-                cnt := 0
-                if len(table.Row2.Zones) > 0 || len(table.Row2.Floors) > 0 {
-                    cnt = countFree(zoneFree, floorFree, table.Row2.Zones, table.Row2.Floors)
-                } else {
-                    for _, v := range zoneFree { cnt += v }
-                }
+            if table.Row2 != nil && (len(table.Row2.Zones) > 0 || len(table.Row2.Floors) > 0) {
+                cnt := countFree(zoneFree, floorFree, table.Row2.Zones, table.Row2.Floors)
                 payload["str2"] = map[string]string{"text": fmt.Sprintf("%d", cnt), "img": table.Row2.Img}
             }
-            if table.Row3 != nil {
-                cnt := 0
-                if len(table.Row3.Zones) > 0 || len(table.Row3.Floors) > 0 {
-                    cnt = countFree(zoneFree, floorFree, table.Row3.Zones, table.Row3.Floors)
-                } else {
-                    for _, v := range zoneFree { cnt += v }
-                }
+            if table.Row3 != nil && (len(table.Row3.Zones) > 0 || len(table.Row3.Floors) > 0) {
+                cnt := countFree(zoneFree, floorFree, table.Row3.Zones, table.Row3.Floors)
                 payload["str3"] = map[string]string{"text": fmt.Sprintf("%d", cnt), "img": table.Row3.Img}
             }
-            if table.Row4 != nil {
-                cnt := 0
-                if len(table.Row4.Zones) > 0 || len(table.Row4.Floors) > 0 {
-                    cnt = countFree(zoneFree, floorFree, table.Row4.Zones, table.Row4.Floors)
-                } else {
-                    for _, v := range zoneFree { cnt += v }
-                }
+            if table.Row4 != nil && (len(table.Row4.Zones) > 0 || len(table.Row4.Floors) > 0) {
+                cnt := countFree(zoneFree, floorFree, table.Row4.Zones, table.Row4.Floors)
                 payload["str4"] = map[string]string{"text": fmt.Sprintf("%d", cnt), "img": table.Row4.Img}
             }
-            
+
             payloadJSON, _ := json.Marshal(payload)
             url := fmt.Sprintf("http://%s:%d/places", table.IP, table.Port)
-            
+
             client := &http.Client{Timeout: 5 * time.Second}
             httpReq, _ := http.NewRequest("POST", url, strings.NewReader(string(payloadJSON)))
             httpReq.Header.Set("Content-Type", "application/json")
             httpReq.Header.Set("Connection", "close")
-            
+
             resp, err := client.Do(httpReq)
             if err != nil {
                 log.Error().Err(err).Str("ip", table.IP).Msg("Send after config save failed")
@@ -2030,7 +2010,7 @@ func (ws *WebServer) handleSaveConfig(w http.ResponseWriter, r *http.Request) {
             }
         }
     }()
-    
+
     respondJSON(w, map[string]interface{}{
         "success": true,
         "message": "Config saved. MPGS fetch and table update triggered.",

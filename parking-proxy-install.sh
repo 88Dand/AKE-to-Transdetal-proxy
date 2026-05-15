@@ -1875,7 +1875,7 @@ func (ws *WebServer) handleTestTable(w http.ResponseWriter, r *http.Request) {
         http.Error(w, "Method not allowed", 405)
         return
     }
-    
+
     var req struct {
         IP      string `json:"ip"`
         Port    int    `json:"port"`
@@ -1898,12 +1898,12 @@ func (ws *WebServer) handleTestTable(w http.ResponseWriter, r *http.Request) {
             Img  string `json:"img"`
         } `json:"row4"`
     }
-    
+
     if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
         respondJSON(w, map[string]interface{}{"error": err.Error()})
         return
     }
-    
+
     payload := map[string]interface{}{
         "type":     "strs",
         "version":  1,
@@ -1915,27 +1915,27 @@ func (ws *WebServer) handleTestTable(w http.ResponseWriter, r *http.Request) {
     if req.Row2 != nil { payload["str2"] = req.Row2 }
     if req.Row3 != nil { payload["str3"] = req.Row3 }
     if req.Row4 != nil { payload["str4"] = req.Row4 }
-    
+
     payloadJSON, _ := json.Marshal(payload)
     url := fmt.Sprintf("http://%s:%d/places", req.IP, req.Port)
-    
+
     client := &http.Client{Timeout: 5 * time.Second}
     startTime := time.Now()
-    
+
     httpReq, _ := http.NewRequest("POST", url, strings.NewReader(string(payloadJSON)))
     httpReq.Header.Set("Content-Type", "application/json")
     httpReq.Header.Set("Connection", "close")
-    
+
     resp, err := client.Do(httpReq)
     elapsed := time.Since(startTime)
-    
+
     result := map[string]interface{}{
         "url":        url,
         "payload":    string(payloadJSON),
         "elapsed_ms": elapsed.Milliseconds(),
         "success":    err == nil && resp != nil && resp.StatusCode == 200,
     }
-    
+
     if err != nil {
         result["error"] = err.Error()
     } else {
@@ -1944,34 +1944,33 @@ func (ws *WebServer) handleTestTable(w http.ResponseWriter, r *http.Request) {
         resp.Body.Close()
         result["response"] = string(body)
     }
-    
+
     respondJSON(w, result)
 }
-
 
 func (ws *WebServer) handleSaveConfig(w http.ResponseWriter, r *http.Request) {
     if r.Method != "POST" {
         http.Error(w, "Method not allowed", 405)
         return
     }
-    
+
     var newCfg Config
     if err := json.NewDecoder(r.Body).Decode(&newCfg); err != nil {
         respondJSON(w, map[string]interface{}{"error": "Invalid JSON: " + err.Error()})
         return
     }
-    
+
     if err := newCfg.Validate(); err != nil {
         respondJSON(w, map[string]interface{}{"error": "Validation: " + err.Error()})
         return
     }
-    
+
     data, err := json.MarshalIndent(newCfg, "", "  ")
     if err != nil {
         respondJSON(w, map[string]interface{}{"error": "Marshal: " + err.Error()})
         return
     }
-    
+
     if err := os.WriteFile(ws.cfgPath, data, 0644); err != nil {
         respondJSON(w, map[string]interface{}{"error": "Write: " + err.Error()})
         return
@@ -2018,20 +2017,20 @@ func (ws *WebServer) handleSaveConfig(w http.ResponseWriter, r *http.Request) {
                 "type": "strs", "version": 1, "datetime": time.Now().Unix(), "pattern": 0,
                 "is_day": isDaytime(),
             }
-            if table.Row1 != nil {
-                cnt := countFreeConfig(zoneFree, floorFree, table.Row1.Zones, table.Row1.Floors)
+            if table.Row1 != nil && (len(table.Row1.Zones) > 0 || len(table.Row1.Floors) > 0) {
+                cnt := countFreeSpaces(zoneFree, floorFree, table.Row1.Zones, table.Row1.Floors)
                 payload["str1"] = map[string]string{"text": fmt.Sprintf("%d", cnt), "img": table.Row1.Img}
             }
-            if table.Row2 != nil {
-                cnt := countFreeConfig(zoneFree, floorFree, table.Row2.Zones, table.Row2.Floors)
+            if table.Row2 != nil && (len(table.Row2.Zones) > 0 || len(table.Row2.Floors) > 0) {
+                cnt := countFreeSpaces(zoneFree, floorFree, table.Row2.Zones, table.Row2.Floors)
                 payload["str2"] = map[string]string{"text": fmt.Sprintf("%d", cnt), "img": table.Row2.Img}
             }
-            if table.Row3 != nil {
-                cnt := countFreeConfig(zoneFree, floorFree, table.Row3.Zones, table.Row3.Floors)
+            if table.Row3 != nil && (len(table.Row3.Zones) > 0 || len(table.Row3.Floors) > 0) {
+                cnt := countFreeSpaces(zoneFree, floorFree, table.Row3.Zones, table.Row3.Floors)
                 payload["str3"] = map[string]string{"text": fmt.Sprintf("%d", cnt), "img": table.Row3.Img}
             }
-            if table.Row4 != nil {
-                cnt := countFreeConfig(zoneFree, floorFree, table.Row4.Zones, table.Row4.Floors)
+            if table.Row4 != nil && (len(table.Row4.Zones) > 0 || len(table.Row4.Floors) > 0) {
+                cnt := countFreeSpaces(zoneFree, floorFree, table.Row4.Zones, table.Row4.Floors)
                 payload["str4"] = map[string]string{"text": fmt.Sprintf("%d", cnt), "img": table.Row4.Img}
             }
 
@@ -2043,23 +2042,19 @@ func (ws *WebServer) handleSaveConfig(w http.ResponseWriter, r *http.Request) {
             httpReq.Header.Set("Connection", "close")
             resp, err := client.Do(httpReq)
             if err != nil {
-                log.Error().Err(err).Str("ip", table.IP).Msg("Send failed")
+                log.Error().Err(err).Str("ip", table.IP).Msg("Send after config save failed")
             } else {
                 body, _ := io.ReadAll(resp.Body)
                 resp.Body.Close()
-                log.Info().Str("ip", table.IP).Int("status", resp.StatusCode).Str("response", string(body)).Msg("Sent to table")
+                log.Info().Str("ip", table.IP).Int("status", resp.StatusCode).Str("response", string(body)).Msg("Sent to table after config save")
             }
         }
     }()
 
-    respondJSON(w, map[string]interface{}{"success": true, "message": "Config saved"})
-}
-
-func countFreeConfig(zoneFree, floorFree map[string]int, zones, floors []string) int {
-    count := 0
-    for _, z := range zones { count += zoneFree[z] }
-    for _, f := range floors { count += floorFree[f] }
-    return count
+    respondJSON(w, map[string]interface{}{
+        "success": true,
+        "message": "Config saved. MPGS fetch and table update triggered.",
+    })
 }
 
 func respondJSON(w http.ResponseWriter, data interface{}) {

@@ -263,6 +263,19 @@ install_golang() {
 create_structure() {
     print_step "Создание структуры проекта"
     
+    # Создание корневого каталога если не существует
+    if [ ! -d "$PROJECT_DIR" ]; then
+        print_status "Создание каталога $PROJECT_DIR..."
+        mkdir -p "$PROJECT_DIR"
+        print_success "Каталог $PROJECT_DIR создан"
+    fi
+    
+    # Переход в каталог
+    cd "$PROJECT_DIR" || {
+        print_error "Не удалось перейти в $PROJECT_DIR"
+        exit 1
+    }
+    
     # Остановка старого сервиса если есть
     if systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
         print_status "Остановка старого сервиса..."
@@ -270,16 +283,15 @@ create_structure() {
         print_success "Старый сервис остановлен"
     fi
     
-    # Создание директорий
+    # Создание дополнительных директорий
     print_status "Создание директорий..."
-    mkdir -p "$PROJECT_DIR"
     mkdir -p "$CONFIG_DIR"
     mkdir -p /var/log/parking
     
     # Очистка старых файлов Go
-    rm -f "$PROJECT_DIR"/*.go
-    rm -f "$PROJECT_DIR"/go.mod
-    rm -f "$PROJECT_DIR"/go.sum
+    rm -f ./*.go
+    rm -f ./go.mod
+    rm -f ./go.sum
     
     print_success "Структура создана в $PROJECT_DIR"
 }
@@ -2253,6 +2265,10 @@ main() {
     echo "  Parking Proxy Installation Script v4.0.0"
     echo "============================================="
     echo ""
+    
+    # Создание корневого каталога сразу
+    mkdir -p "$PROJECT_DIR"
+    cd "$PROJECT_DIR" || exit 1
     
     # Инициализация лога
     mkdir -p "$(dirname "$LOG_FILE")"

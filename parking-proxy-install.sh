@@ -389,7 +389,7 @@ MAINEOF
     # Создание config.go
     print_status "Создание config.go..."
     cat > "$PROJECT_DIR/config.go" << 'CONFIGEOF'
-package config
+package main
 
 import (
     "encoding/json"
@@ -562,7 +562,7 @@ CONFIGEOF
     # Создание mpgs.go
     print_status "Создание mpgs.go..."
     cat > "$PROJECT_DIR/mpgs.go" << 'FETCHEREOF'
-package fetcher
+package main
 
 import (
     "bytes"
@@ -728,7 +728,7 @@ FETCHEREOF
     # Создание astro.go
     print_status "Создание astro.go..."
     cat > "$PROJECT_DIR/astro.go" << 'ASTROEOF'
-package astro
+package main
 
 import (
     "time"
@@ -771,7 +771,7 @@ ASTROEOF
     # Создание processor.go
     print_status "Создание processor.go..."
     cat > "$PROJECT_DIR/processor.go" << 'PROCESSOREOF'
-package processor
+package main
 
 import (
     "fmt"
@@ -942,7 +942,7 @@ PROCESSOREOF
     # Создание sender.go
     print_status "Создание sender.go..."
     cat > "$PROJECT_DIR/sender.go" << 'SENDEREOF'
-package sender
+package main
 
 import (
     "bytes"
@@ -1031,7 +1031,7 @@ SENDEREOF
     # Создание service.go
     print_status "Создание service.go..."
     cat > "$PROJECT_DIR/service.go" << 'SERVICEEOF'
-package service
+package main
 
 import (
     "context"
@@ -1144,7 +1144,7 @@ SERVICEEOF
     # Создание web.go
     print_status "Создание web.go..."
     cat > "$PROJECT_DIR/web.go" << 'WEBEOF'
-package web
+package main
 
 import (
     "context"

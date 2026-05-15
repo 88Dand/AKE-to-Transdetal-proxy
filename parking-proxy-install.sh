@@ -363,7 +363,7 @@ func main() {
     signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
     // Запуск веб-интерфейса
-    webServer := web.New(*webAddr, *configPath)
+    webServer := web.NewWebServer(*webAddr, *configPath)
     go func() {
         if err := webServer.Start(); err != nil {
             log.Error().Err(err).Msg("Web server error")
@@ -741,7 +741,7 @@ type SunCalc struct {
     Lat, Lon float64
 }
 
-func New(lat, lon float64) *SunCalc {
+func NewSunCalc(lat, lon float64) *SunCalc {
     return &SunCalc{Lat: lat, Lon: lon}
 }
 
@@ -802,7 +802,7 @@ type Processor struct {
     lastFreeCount map[string]int // IP_row -> freeCount для сравнения изменений
 }
 
-func New() *Processor {
+func NewProcessor() *Processor {
     return &Processor{
         lastFreeCount: make(map[string]int),
     }
@@ -1042,11 +1042,11 @@ import (
 )
 
 type Service struct {
-    cfg         *config.Config
-    fetcher     *fetcher.MPGSFetcher
-    processor   *processor.Processor
-    sender      *sender.TableSender
-    astro       *astro.SunCalc
+    cfg         *Config
+    fetcher     *MPGSFetcher
+    processor   *Processor
+    sender      *TableSender
+    astro       *SunCalc
     isDay       bool
     dayMu       sync.RWMutex
     fetchErrors int
@@ -1056,9 +1056,9 @@ func New(cfg *config.Config) *Service {
     return &Service{
         cfg:       cfg,
         fetcher:   fetcher.NewMPGSFetcher(cfg.MPGS.BaseURL, cfg.MPGS.Key, cfg.MPGS.Secret, cfg.MPGS.Version, cfg.MPGS.Timeout),
-        processor: processor.New(),
+        processor: processor.NewProcessor(),
         sender:    sender.NewTableSender(2),
-        astro:     astro.New(cfg.Location.Lat, cfg.Location.Lon),
+        astro:     astro.NewSunCalc(cfg.Location.Lat, cfg.Location.Lon),
         isDay:     true,
     }
 }
@@ -1164,7 +1164,7 @@ type WebServer struct {
     cfgPath string
 }
 
-func New(addr, cfgPath string) *WebServer {
+func NewWebServer(addr, cfgPath string) *WebServer {
     ws := &WebServer{
         cfgPath: cfgPath,
         srv: &http.Server{
@@ -1876,16 +1876,6 @@ func (ws *WebServer) handleTestTable(w http.ResponseWriter, r *http.Request) {
     respondJSON(w, result)
 }
 
-func countFree(zoneFree, floorFree map[string]int, zones, floors []string) int {
-    count := 0
-    for _, z := range zones {
-        count += zoneFree[z]
-    }
-    for _, f := range floors {
-        count += floorFree[f]
-    }
-    return count
-}
 
 func (ws *WebServer) handleSaveConfig(w http.ResponseWriter, r *http.Request) {
     if r.Method != "POST" {

@@ -1779,7 +1779,7 @@ func buildIndexHTML(cfg *Config) string {
         len(cfg.Tables),
         savedTablesJSON(cfg),
         cfg.SunriseHour,
-        cfg.SunsetHour)
+        cfg.SunsetHour
     
     return html
 }

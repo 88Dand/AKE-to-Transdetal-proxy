@@ -282,7 +282,14 @@ create_structure() {
         systemctl stop "$SERVICE_NAME"
         print_success "Старый сервис остановлен"
     fi
-    
+    # Удаление старого сервиса если есть
+    if [ -f "/etc/systemd/system/${SERVICE_NAME}.service" ]; then
+        print_status "Удаление старого сервиса..."
+        systemctl disable "$SERVICE_NAME" >> "$LOG_FILE" 2>&1
+        rm -f "/etc/systemd/system/${SERVICE_NAME}.service"
+        systemctl daemon-reload
+        print_success "Старый сервис удалён"
+    fi
     # Создание дополнительных директорий
     print_status "Создание директорий..."
     mkdir -p "$CONFIG_DIR"

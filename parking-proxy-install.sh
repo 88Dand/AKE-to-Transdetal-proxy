@@ -363,7 +363,7 @@ func main() {
     signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
     // Запуск веб-интерфейса
-    webServer := web.NewWebServer(*webAddr, *configPath)
+    webServer := NewWebServer(*webAddr, *configPath)
     go func() {
         if err := webServer.Start(); err != nil {
             log.Error().Err(err).Msg("Web server error")

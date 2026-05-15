@@ -350,14 +350,7 @@ func main() {
         lvl = zerolog.InfoLevel
     }
     zerolog.SetGlobalLevel(lvl)
-    logFile, err := os.OpenFile("/var/log/parking/proxy.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-    if err == nil {
-        multi := zerolog.MultiLevelWriter(
-            zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339},
-            logFile,
-        )
-        log.Logger = zerolog.New(multi).With().Timestamp().Logger()
-    }
+
     ctx, cancel := context.WithCancel(context.Background())
     sigChan := make(chan os.Signal, 1)
     signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)

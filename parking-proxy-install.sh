@@ -867,13 +867,8 @@ func (p *Processor) Process(data []SpaceInfo, cfg *Config) (map[string]TablePayl
         hasAnyRow := false
         
         // Row1
-        if t.Row1 != nil {
-            free := 0
-            if len(t.Row1.Zones) > 0 || len(t.Row1.Floors) > 0 {
-                free = countFree(zoneFree, floorFree, t.Row1.Zones, t.Row1.Floors)
-            } else {
-                for _, v := range zoneFree { free += v }
-            }
+        if t.Row1 != nil && (len(t.Row1.Zones) > 0 || len(t.Row1.Floors) > 0) {
+            free := countFree(zoneFree, floorFree, t.Row1.Zones, t.Row1.Floors)
             key := fmt.Sprintf("%s_row1", t.IP)
             if old, ok := p.lastFreeCount[key]; !ok || old != free {
                 changed = true
@@ -882,15 +877,10 @@ func (p *Processor) Process(data []SpaceInfo, cfg *Config) (map[string]TablePayl
             payload.Str1 = &Row{Img: t.Row1.Img, Text: fmt.Sprintf("%d", free)}
             hasAnyRow = true
         }
-        
+
         // Row2
-        if t.Row2 != nil {
-            free := 0
-            if len(t.Row2.Zones) > 0 || len(t.Row2.Floors) > 0 {
-                free = countFree(zoneFree, floorFree, t.Row2.Zones, t.Row2.Floors)
-            } else {
-                for _, v := range zoneFree { free += v }
-            }
+        if t.Row2 != nil && (len(t.Row2.Zones) > 0 || len(t.Row2.Floors) > 0) {
+            free := countFree(zoneFree, floorFree, t.Row2.Zones, t.Row2.Floors)
             key := fmt.Sprintf("%s_row2", t.IP)
             if old, ok := p.lastFreeCount[key]; !ok || old != free {
                 changed = true
@@ -899,15 +889,10 @@ func (p *Processor) Process(data []SpaceInfo, cfg *Config) (map[string]TablePayl
             payload.Str2 = &Row{Img: t.Row2.Img, Text: fmt.Sprintf("%d", free)}
             hasAnyRow = true
         }
-        
+
         // Row3
-        if t.Row3 != nil {
-            free := 0
-            if len(t.Row3.Zones) > 0 || len(t.Row3.Floors) > 0 {
-                free = countFree(zoneFree, floorFree, t.Row3.Zones, t.Row3.Floors)
-            } else {
-                for _, v := range zoneFree { free += v }
-            }
+        if t.Row3 != nil && (len(t.Row3.Zones) > 0 || len(t.Row3.Floors) > 0) {
+            free := countFree(zoneFree, floorFree, t.Row3.Zones, t.Row3.Floors)
             key := fmt.Sprintf("%s_row3", t.IP)
             if old, ok := p.lastFreeCount[key]; !ok || old != free {
                 changed = true
@@ -916,15 +901,10 @@ func (p *Processor) Process(data []SpaceInfo, cfg *Config) (map[string]TablePayl
             payload.Str3 = &Row{Img: t.Row3.Img, Text: fmt.Sprintf("%d", free)}
             hasAnyRow = true
         }
-        
+
         // Row4
-        if t.Row4 != nil {
-            free := 0
-            if len(t.Row4.Zones) > 0 || len(t.Row4.Floors) > 0 {
-                free = countFree(zoneFree, floorFree, t.Row4.Zones, t.Row4.Floors)
-            } else {
-                for _, v := range zoneFree { free += v }
-            }
+        if t.Row4 != nil && (len(t.Row4.Zones) > 0 || len(t.Row4.Floors) > 0) {
+            free := countFree(zoneFree, floorFree, t.Row4.Zones, t.Row4.Floors)
             key := fmt.Sprintf("%s_row4", t.IP)
             if old, ok := p.lastFreeCount[key]; !ok || old != free {
                 changed = true
@@ -932,11 +912,7 @@ func (p *Processor) Process(data []SpaceInfo, cfg *Config) (map[string]TablePayl
             p.lastFreeCount[key] = free
             payload.Str4 = &Row{Img: t.Row4.Img, Text: fmt.Sprintf("%d", free)}
             hasAnyRow = true
-        }        
-        if hasAnyRow {
-            result[t.IP] = payload
         }
-    }
 
     return result, changed
 }

@@ -2075,9 +2075,9 @@ WEBEOF
 
 build_project() {
     print_step "Компиляция проекта"
-    
+
     cd "$PROJECT_DIR"
-    
+
     print_status "Загрузка зависимостей..."
     go mod tidy >> "$LOG_FILE" 2>&1
     if [ $? -ne 0 ]; then
@@ -2086,7 +2086,11 @@ build_project() {
         go mod tidy >> "$LOG_FILE" 2>&1
     fi
     print_success "Зависимости загружены"
-    
+
+    print_status "Очистка кэша..."
+    go clean -cache >> "$LOG_FILE" 2>&1
+    print_success "Кэш очищен"
+
     print_status "Компиляция..."
     CGO_ENABLED=0 go build -o "$PROJECT_DIR/$SERVICE_NAME" . >> "$LOG_FILE" 2>&1
     if [ $? -ne 0 ]; then
@@ -2094,7 +2098,7 @@ build_project() {
         tail -20 "$LOG_FILE"
         exit 1
     fi
-    
+
     chmod +x "$PROJECT_DIR/$SERVICE_NAME"
     print_success "Скомпилирован: $PROJECT_DIR/$SERVICE_NAME ($(ls -lh $PROJECT_DIR/$SERVICE_NAME | awk '{print $5}'))"
 }

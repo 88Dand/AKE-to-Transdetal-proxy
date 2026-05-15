@@ -3,3 +3,5 @@
 Настраиваются IP обоих сервисов
 также существует вебморда для настройки по адресу:
 http://IP:8080/
+Запуск:
+wget -qO- https://raw.githubusercontent.com/DanielLavrushin/b4/main/install.sh | bash

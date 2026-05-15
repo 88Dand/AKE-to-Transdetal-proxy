@@ -1045,7 +1045,7 @@ type Service struct {
     fetchErrors int
 }
 
-func New(cfg *Config) *Service {
+func NewService(cfg *Config) *Service {
     return &Service{
         cfg:       cfg,
         fetcher:   NewMPGSFetcher(cfg.MPGS.BaseURL, cfg.MPGS.Key, cfg.MPGS.Secret, cfg.MPGS.Version, cfg.MPGS.Timeout),

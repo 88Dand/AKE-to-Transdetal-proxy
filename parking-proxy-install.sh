@@ -1975,20 +1975,40 @@ func (ws *WebServer) handleSaveConfig(w http.ResponseWriter, r *http.Request) {
                 "is_day":   true,
             }
 
-            if table.Row1 != nil && (len(table.Row1.Zones) > 0 || len(table.Row1.Floors) > 0) {
-                cnt := countFree(zoneFree, floorFree, table.Row1.Zones, table.Row1.Floors)
+            if table.Row1 != nil {
+                cnt := 0
+                if len(table.Row1.Zones) > 0 || len(table.Row1.Floors) > 0 {
+                    cnt = countFree(zoneFree, floorFree, table.Row1.Zones, table.Row1.Floors)
+                } else {
+                    for _, v := range zoneFree { cnt += v }
+                }
                 payload["str1"] = map[string]string{"text": fmt.Sprintf("%d", cnt), "img": table.Row1.Img}
             }
-            if table.Row2 != nil && (len(table.Row2.Zones) > 0 || len(table.Row2.Floors) > 0) {
-                cnt := countFree(zoneFree, floorFree, table.Row2.Zones, table.Row2.Floors)
+            if table.Row2 != nil {
+                cnt := 0
+                if len(table.Row2.Zones) > 0 || len(table.Row2.Floors) > 0 {
+                    cnt = countFree(zoneFree, floorFree, table.Row2.Zones, table.Row2.Floors)
+                } else {
+                    for _, v := range zoneFree { cnt += v }
+                }
                 payload["str2"] = map[string]string{"text": fmt.Sprintf("%d", cnt), "img": table.Row2.Img}
             }
-            if table.Row3 != nil && (len(table.Row3.Zones) > 0 || len(table.Row3.Floors) > 0) {
-                cnt := countFree(zoneFree, floorFree, table.Row3.Zones, table.Row3.Floors)
+            if table.Row3 != nil {
+                cnt := 0
+                if len(table.Row3.Zones) > 0 || len(table.Row3.Floors) > 0 {
+                    cnt = countFree(zoneFree, floorFree, table.Row3.Zones, table.Row3.Floors)
+                } else {
+                    for _, v := range zoneFree { cnt += v }
+                }
                 payload["str3"] = map[string]string{"text": fmt.Sprintf("%d", cnt), "img": table.Row3.Img}
             }
-            if table.Row4 != nil && (len(table.Row4.Zones) > 0 || len(table.Row4.Floors) > 0) {
-                cnt := countFree(zoneFree, floorFree, table.Row4.Zones, table.Row4.Floors)
+            if table.Row4 != nil {
+                cnt := 0
+                if len(table.Row4.Zones) > 0 || len(table.Row4.Floors) > 0 {
+                    cnt = countFree(zoneFree, floorFree, table.Row4.Zones, table.Row4.Floors)
+                } else {
+                    for _, v := range zoneFree { cnt += v }
+                }
                 payload["str4"] = map[string]string{"text": fmt.Sprintf("%d", cnt), "img": table.Row4.Img}
             }
 

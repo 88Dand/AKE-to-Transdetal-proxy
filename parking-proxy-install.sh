@@ -340,7 +340,7 @@ func main() {
     zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
     log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339})
 
-    cfg, err := config.Load(*configPath)
+    cfg, err := Load(*configPath)
     if err != nil {
         log.Fatal().Err(err).Msg("Failed to load config")
     }
@@ -377,7 +377,7 @@ func main() {
         cancel()
     }()
 
-    svc := service.New(cfg)
+    svc := NewService(cfg)
     svc.Run(ctx)
 
     log.Info().Msg("Application stopped")
@@ -808,7 +808,7 @@ func NewProcessor() *Processor {
     }
 }
 
-func (p *Processor) Process(data []fetcher.SpaceInfo, cfg *config.Config, isDay bool) (map[string]TablePayload, bool) {
+func (p *Processor) Process(data []SpaceInfo, cfg *Config, isDay bool) (map[string]TablePayload, bool) {
     p.mu.Lock()
     defer p.mu.Unlock()
 
@@ -972,7 +972,7 @@ func NewTableSender(timeout int) *TableSender {
     }
 }
 
-func (s *TableSender) SendWithRetry(ctx context.Context, ip string, port int, payload processor.TablePayload) error {
+func (s *TableSender) SendWithRetry(ctx context.Context, ip string, port int, payload TablePayload) error {
     startTime := time.Now()
     payload.DateTime = time.Now().Unix()
     url := fmt.Sprintf("http://%s:%d/places", ip, port)
@@ -1052,10 +1052,10 @@ type Service struct {
     fetchErrors int
 }
 
-func New(cfg *config.Config) *Service {
+func New(cfg *Config) *Service {
     return &Service{
         cfg:       cfg,
-        fetcher:   fetcher.NewMPGSFetcher(cfg.MPGS.BaseURL, cfg.MPGS.Key, cfg.MPGS.Secret, cfg.MPGS.Version, cfg.MPGS.Timeout),
+        fetcher:   NewMPGSFetcher(cfg.MPGS.BaseURL, cfg.MPGS.Key, cfg.MPGS.Secret, cfg.MPGS.Version, cfg.MPGS.Timeout),
         processor: processor.NewProcessor(),
         sender:    sender.NewTableSender(2),
         astro:     astro.NewSunCalc(cfg.Location.Lat, cfg.Location.Lon),
@@ -1115,7 +1115,7 @@ func (s *Service) tick(ctx context.Context, forceSend bool) {
     var wg sync.WaitGroup
     for ip, payload := range payloads {
         wg.Add(1)
-        go func(ip string, p processor.TablePayload) {
+        go func(ip string, p TablePayload) {
             defer wg.Done()
             var port int
             var mode string
@@ -1195,7 +1195,7 @@ func (ws *WebServer) Shutdown(ctx context.Context) error {
 }
 
 func (ws *WebServer) handleIndex(w http.ResponseWriter, r *http.Request) {
-    cfg := config.Get()
+    cfg := Get()
     if cfg == nil {
         http.Error(w, "Config not loaded", 500)
         return
@@ -1221,17 +1221,17 @@ func buildImgSelect(id string, selected string) string {
     return html
 }
 
-func savedTablesJSON(cfg *config.Config) string {
+func savedTablesJSON(cfg *Config) string {
     data, _ := json.Marshal(cfg.Tables)
     return string(data)
 }
 
-func buildIndexHTML(cfg *config.Config) string {
+func buildIndexHTML(cfg *Config) string {
     tablesHTML := ""
     for i, t := range cfg.Tables {
         rowsHTML := ""
         for j := 1; j <= 4; j++ {
-            var row *config.RowConfig
+            var row *RowConfig
             switch j {
             case 1: row = t.Row1
             case 2: row = t.Row2
@@ -1737,7 +1737,7 @@ func (ws *WebServer) handleTestMPGS(w http.ResponseWriter, r *http.Request) {
     if req.Timeout == 0 { req.Timeout = 5 }
     if req.Version == "" { req.Version = "V3.6.0" }
     
-    f := fetcher.NewMPGSFetcher(req.BaseURL, req.Key, req.Secret, req.Version, req.Timeout)
+    f := NewMPGSFetcher(req.BaseURL, req.Key, req.Secret, req.Version, req.Timeout)
     
     ctx, cancel := context.WithTimeout(r.Context(), time.Duration(req.Timeout)*time.Second)
     defer cancel()
@@ -1883,7 +1883,7 @@ func (ws *WebServer) handleSaveConfig(w http.ResponseWriter, r *http.Request) {
         return
     }
     
-    var newCfg config.Config
+    var newCfg Config
     if err := json.NewDecoder(r.Body).Decode(&newCfg); err != nil {
         respondJSON(w, map[string]interface{}{"error": "Invalid JSON: " + err.Error()})
         return
@@ -1907,13 +1907,13 @@ func (ws *WebServer) handleSaveConfig(w http.ResponseWriter, r *http.Request) {
     
     go func() {
         time.Sleep(1 * time.Second)
-        cfg := config.Get()
+        cfg := Get()
         if cfg == nil {
             log.Error().Msg("Config not loaded after save")
             return
         }
         
-        f := fetcher.NewMPGSFetcher(cfg.MPGS.BaseURL, cfg.MPGS.Key, cfg.MPGS.Secret, cfg.MPGS.Version, cfg.MPGS.Timeout)
+        f := NewMPGSFetcher(cfg.MPGS.BaseURL, cfg.MPGS.Key, cfg.MPGS.Secret, cfg.MPGS.Version, cfg.MPGS.Timeout)
         ctx, cancel := context.WithTimeout(context.Background(), time.Duration(cfg.MPGS.Timeout)*time.Second)
         defer cancel()
         

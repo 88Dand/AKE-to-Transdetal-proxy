@@ -913,7 +913,6 @@ func (p *Processor) Process(data []SpaceInfo, cfg *Config) (map[string]TablePayl
             payload.Str4 = &Row{Img: t.Row4.Img, Text: fmt.Sprintf("%d", free)}
             hasAnyRow = true
         }
-
     return result, changed
 }
 
@@ -1780,7 +1779,7 @@ func buildIndexHTML(cfg *Config) string {
         len(cfg.Tables),
         savedTablesJSON(cfg),
         cfg.SunriseHour,
-        cfg.SunsetHour)
+        cfg.SunsetHour
     
     return html
 }

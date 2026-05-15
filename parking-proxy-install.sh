@@ -116,17 +116,59 @@ check_system() {
  fi
  print_success "Права root подтверждены"
 
- # Проверка на повторную установку (идемпотентность)
- if [ -f "/etc/systemd/system/${SERVICE_NAME}.service" ] && [ -d "$PROJECT_DIR" ]; then
-  print_warning "Сервис $SERVICE_NAME уже установлен в $PROJECT_DIR"
-  read -p "Продолжить переустановку? (y/N): " -n 1 -r
-  echo
-  if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-   print_info "Установка отменена пользователем"
-   exit 0
-  fi
-  print_info "Выполняется переустановка..."
+# Проверка на повторную установку (идемпотентность) — ИСПРАВЛЕНО
+print_status "Проверка существующей установки..."
+SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
+MAIN_BINARY="$PROJECT_DIR/$SERVICE_NAME"
+
+# Сервис считается установленным только если:
+# 1. Есть unit-файл
+# 2. Есть исполняемый бинарник
+# 3. systemd видит этот сервис
+if [ -f "$SERVICE_FILE" ] && [ -x "$MAIN_BINARY" ] && systemctl list-unit-files 2>/dev/null | grep -q "^${SERVICE_NAME}\.service"; then
+ print_warning "Сервис $SERVICE_NAME уже установлен и работоспособен"
+ echo ""
+ echo "Выберите действие:"
+ echo "  [1] Переустановить (с сохранением config.json)"
+ echo "  [2] Полная очистка и установка с нуля"
+ echo "  [N] Отмена"
+ read -p "Ваш выбор (1/2/N): " -r
+ echo
+ if [[ "$REPLY" =~ ^[1]$ ]]; then
+  print_info "Режим: переустановка с сохранением конфигурации"
+  BACKUP_CONFIG=true
+ elif [[ "$REPLY" =~ ^[2]$ ]]; then
+  print_info "Режим: полная переустановка"
+  BACKUP_CONFIG=false
+  # Очистка перед установкой
+  systemctl stop "$SERVICE_NAME" 2>/dev/null || true
+  systemctl disable "$SERVICE_NAME" 2>/dev/null || true
+  rm -f "$SERVICE_FILE"
+  systemctl daemon-reload 2>/dev/null || true
+  rm -rf "$PROJECT_DIR"
+  mkdir -p "$PROJECT_DIR"
+ else
+  print_info "Установка отменена пользователем"
+  exit 0
  fi
+elif [ -d "$PROJECT_DIR" ] || [ -f "$SERVICE_FILE" ]; then
+ # Частичная/битая установка — предлагаем восстановить
+ print_warning "Обнаружена неполная установка в $PROJECT_DIR"
+ read -p "Очистить и продолжить? (y/N): " -n 1 -r
+ echo
+ if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+  print_info "Установка отменена"
+  exit 0
+ fi
+ # Безопасная очистка
+ systemctl stop "$SERVICE_NAME" 2>/dev/null || true
+ systemctl disable "$SERVICE_NAME" 2>/dev/null || true
+ rm -f "$SERVICE_FILE"
+ systemctl daemon-reload 2>/dev/null || true
+ rm -rf "$PROJECT_DIR"
+ mkdir -p "$PROJECT_DIR"
+ print_success "Очистка завершена"
+fi
 
  # Определение ОС (ИСПРАВЛЕНО: универсальный детектор)
  print_status "Определение операционной системы..."

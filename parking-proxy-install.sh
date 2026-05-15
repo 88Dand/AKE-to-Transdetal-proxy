@@ -1635,6 +1635,7 @@ func buildIndexHTML(cfg *Config) string {
                     var textElem = document.getElementById("table_" + i + "_row" + j + "_text");
                     var imgElem = document.getElementById("table_" + i + "_row" + j + "_img");
                     var textVal = textElem ? textElem.value.trim() : "";
+                    var imgVal = imgElem ? imgElem.value : "";
                     
                     var selectedZones = getCheckedValues(i, j, 'zone');
                     var selectedFloors = getCheckedValues(i, j, 'floor');
@@ -1643,7 +1644,7 @@ func buildIndexHTML(cfg *Config) string {
                     if (hasSelection && textVal !== "") {
                         table["row" + j] = {
                             text: textVal,
-                            img: imgElem ? imgElem.value : "",
+                            img: imgVal,
                             zones: selectedZones,
                             floors: selectedFloors
                         };

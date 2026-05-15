@@ -451,11 +451,13 @@ type Location struct {
 }
 
 type Config struct {
-    MPGS       MPGSConfig       `json:"mpgs"`
-    Navigation NavigationConfig `json:"navigation"`
-    Tables     []TableConfig    `json:"tables"`
-    Location   Location         `json:"location"`
-    LogLevel   string           `json:"log_level"`
+    MPGS         MPGSConfig       `json:"mpgs"`
+    Navigation   NavigationConfig `json:"navigation"`
+    Tables       []TableConfig    `json:"tables"`
+    Location     Location         `json:"location"`
+    LogLevel     string           `json:"log_level"`
+    SunriseHour  int              `json:"sunrise_hour"`
+    SunsetHour   int              `json:"sunset_hour"`
 }
 
 var (
@@ -952,8 +954,15 @@ func countFree(zoneFree, floorFree map[string]int, zones, floors []string) int {
 	
 }
 func isDaytime() bool {
+    cfg := Get()
     now := time.Now()
-    return now.Hour() >= 7 && now.Hour() < 18
+    sunrise := 7
+    sunset := 18
+    if cfg != nil {
+        if cfg.SunriseHour > 0 { sunrise = cfg.SunriseHour }
+        if cfg.SunsetHour > 0 { sunset = cfg.SunsetHour }
+    }
+    return now.Hour() >= sunrise && now.Hour() < sunset
 }
 
 PROCESSOREOF
@@ -1725,7 +1734,67 @@ func buildIndexHTML(cfg *Config) string {
         // Автозагрузка при старте
         testMPGS();
         setTimeout(loadSavedCheckboxes, 3000);
+        function saveDayNight() {
+            var config = {
+                mpgs: {
+                    base_url: document.getElementById("mpgs_url").value,
+                    key: document.getElementById("mpgs_key").value,
+                    secret: document.getElementById("mpgs_secret").value,
+                    version: "V3.6.0",
+                    timeout_sec: parseInt(document.getElementById("mpgs_timeout").value)
+                },
+                navigation: { url: "http://navi.internal/update", timeout_sec: 2 },
+                location: { lat: 55.7558, lon: 37.6173 },
+                log_level: "debug",
+                sunrise_hour: parseInt(document.getElementById("sunrise_hour").value),
+                sunset_hour: parseInt(document.getElementById("sunset_hour").value),
+                tables: []
+            };
+            for (var i = 0; i < tablesCount; i++) {
+                var ipElem = document.getElementById("table_" + i + "_ip");
+                if (!ipElem) continue;
+                var table = { ip: ipElem.value, port: parseInt(document.getElementById("table_" + i + "_port").value), mode: "push", pattern: 0 };
+                for (var j = 1; j <= 4; j++) {
+                    var textElem = document.getElementById("table_" + i + "_row" + j + "_text");
+                    var imgElem = document.getElementById("table_" + i + "_row" + j + "_img");
+                    if (textElem && textElem.value.trim()) {
+                        var row = {
+                            text: textElem.value.trim(),
+                            img: imgElem ? imgElem.value : "",
+                            zones: getCheckedValues(i, j, 'zone'),
+                            floors: getCheckedValues(i, j, 'floor')
+                        };
+                        table["row" + j] = row;
+                    }
+                }
+                config.tables.push(table);
+            }
+            fetch("/api/save-config", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(config) })
+            .then(function(r) { return r.json(); })
+            .then(function(result) {
+                document.getElementById("daynight_result").innerHTML = "<pre>" + JSON.stringify(result, null, 2) + "</pre>";
+            });
+        }
     </script>
+        <div class="block">
+            <h2>Day/Night Settings</h2>
+            <div class="row">
+                <div class="col">
+                    <div class="form-group">
+                        <label>Sunrise Hour (is_day: true)</label>
+                        <input type="number" id="sunrise_hour" value="%d" min="0" max="23">
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="form-group">
+                        <label>Sunset Hour (is_day: false)</label>
+                        <input type="number" id="sunset_hour" value="%d" min="0" max="23">
+                    </div>
+                </div>
+            </div>
+            <button onclick="saveDayNight()">Save Day/Night</button>
+            <div id="daynight_result" class="result"></div>
+        </div>
 </body>
 </html>`,
         cfg.MPGS.BaseURL, len(cfg.Tables),
@@ -1733,7 +1802,9 @@ func buildIndexHTML(cfg *Config) string {
         cfg.MPGS.Key, cfg.MPGS.Secret,
         tablesHTML,
         len(cfg.Tables),
-        savedTablesJSON(cfg))
+        savedTablesJSON(cfg),
+        cfg.SunriseHour,
+        cfg.SunsetHour)
     
     return html
 }
@@ -2079,6 +2150,8 @@ create_config() {
   },
   "log_level": "info",
   "log_requests": false,
+  "sunrise_hour": 7,
+  "sunset_hour": 18,
   "tables": [
     {
       "ip": "${TABLE1_IP}",

@@ -868,7 +868,7 @@ func (p *Processor) Process(data []SpaceInfo, cfg *Config) (map[string]TablePayl
         
         // Row1
         if t.Row1 != nil && (len(t.Row1.Zones) > 0 || len(t.Row1.Floors) > 0) {
-            free := countFree(zoneFree, floorFree, t.Row1.Zones, t.Row1.Floors)
+            free := countFreeSpaces(zoneFree, floorFree, t.Row1.Zones, t.Row1.Floors)
             key := fmt.Sprintf("%s_row1", t.IP)
             if old, ok := p.lastFreeCount[key]; !ok || old != free {
                 changed = true
@@ -880,7 +880,7 @@ func (p *Processor) Process(data []SpaceInfo, cfg *Config) (map[string]TablePayl
 
         // Row2
         if t.Row2 != nil && (len(t.Row2.Zones) > 0 || len(t.Row2.Floors) > 0) {
-            free := countFree(zoneFree, floorFree, t.Row2.Zones, t.Row2.Floors)
+            free := countFreeSpaces(zoneFree, floorFree, t.Row2.Zones, t.Row2.Floors)
             key := fmt.Sprintf("%s_row2", t.IP)
             if old, ok := p.lastFreeCount[key]; !ok || old != free {
                 changed = true
@@ -892,7 +892,7 @@ func (p *Processor) Process(data []SpaceInfo, cfg *Config) (map[string]TablePayl
 
         // Row3
         if t.Row3 != nil && (len(t.Row3.Zones) > 0 || len(t.Row3.Floors) > 0) {
-            free := countFree(zoneFree, floorFree, t.Row3.Zones, t.Row3.Floors)
+            free := countFreeSpaces(zoneFree, floorFree, t.Row3.Zones, t.Row3.Floors)
             key := fmt.Sprintf("%s_row3", t.IP)
             if old, ok := p.lastFreeCount[key]; !ok || old != free {
                 changed = true
@@ -904,7 +904,7 @@ func (p *Processor) Process(data []SpaceInfo, cfg *Config) (map[string]TablePayl
 
         // Row4
         if t.Row4 != nil && (len(t.Row4.Zones) > 0 || len(t.Row4.Floors) > 0) {
-            free := countFree(zoneFree, floorFree, t.Row4.Zones, t.Row4.Floors)
+            free := countFreeSpaces(zoneFree, floorFree, t.Row4.Zones, t.Row4.Floors)
             key := fmt.Sprintf("%s_row4", t.IP)
             if old, ok := p.lastFreeCount[key]; !ok || old != free {
                 changed = true
@@ -917,7 +917,7 @@ func (p *Processor) Process(data []SpaceInfo, cfg *Config) (map[string]TablePayl
 }
 
 
-func countFree(zoneFree, floorFree map[string]int, zones, floors []string) int {
+func countFreeSpaces(zoneFree, floorFree map[string]int, zones, floors []string) int {
     count := 0
     for _, z := range zones {
         count += zoneFree[z]

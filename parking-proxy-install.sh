@@ -1104,6 +1104,10 @@ func (s *Service) Run(ctx context.Context) {
 }
 
 func (s *Service) tick(ctx context.Context, forceSend bool) {
+    // Обновляем конфиг и fetcher (hot-reload)
+    s.cfg = Get()
+    s.fetcher = NewMPGSFetcher(s.cfg.MPGS.BaseURL, s.cfg.MPGS.Key, s.cfg.MPGS.Secret, s.cfg.MPGS.Version, s.cfg.MPGS.Timeout)
+
     data, err := s.fetcher.Fetch(ctx)
     if err != nil {
         s.fetchErrors++

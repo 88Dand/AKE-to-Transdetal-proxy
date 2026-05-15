@@ -820,7 +820,7 @@ func NewProcessor() *Processor {
     }
 }
 
-func (p *Processor) Process(data []SpaceInfo, cfg *Config, isDay bool) (map[string]TablePayload, bool) {
+func (p *Processor) Process(data []SpaceInfo, cfg *Config) (map[string]TablePayload, bool) {
     p.mu.Lock()
     defer p.mu.Unlock()
 
@@ -858,7 +858,7 @@ func (p *Processor) Process(data []SpaceInfo, cfg *Config, isDay bool) (map[stri
             Type:    "strs",
             Version: 1,
             Pattern: t.Pattern,
-            IsDay:   isDay,
+            IsDay:   isDaytime,
         }
         
         hasAnyRow := false
@@ -938,6 +938,11 @@ func (p *Processor) Process(data []SpaceInfo, cfg *Config, isDay bool) (map[stri
     return result, changed
 }
 
+func isDaytime() bool {
+    now := time.Now()
+    return now.Hour() >= 7 && now.Hour() < 18
+}
+
 func countFree(zoneFree, floorFree map[string]int, zones, floors []string) int {
     count := 0
     for _, z := range zones {
@@ -947,7 +952,13 @@ func countFree(zoneFree, floorFree map[string]int, zones, floors []string) int {
         count += floorFree[f]
     }
     return count
+	
 }
+func isDaytime() bool {
+    now := time.Now()
+    return now.Hour() >= 7 && now.Hour() < 18
+}
+
 PROCESSOREOF
     print_success "processor.go создан"
     
@@ -1054,13 +1065,10 @@ import (
 )
 
 type Service struct {
-    cfg       *Config
-    fetcher   *MPGSFetcher
-    processor *Processor
-    sender    *TableSender
-    astro     *SunCalc
-    isDay       bool
-    dayMu       sync.RWMutex
+    cfg         *Config
+    fetcher     *MPGSFetcher
+    processor   *Processor
+    sender      *TableSender
     fetchErrors int
 }
 
@@ -1070,28 +1078,21 @@ func NewService(cfg *Config) *Service {
         fetcher:   NewMPGSFetcher(cfg.MPGS.BaseURL, cfg.MPGS.Key, cfg.MPGS.Secret, cfg.MPGS.Version, cfg.MPGS.Timeout),
         processor: NewProcessor(),
         sender:    NewTableSender(2),
-        astro:     NewSunCalc(cfg.Location.Lat, cfg.Location.Lon),
-        isDay:     true,
     }
 }
 
 func (s *Service) Run(ctx context.Context) {
-    s.dayMu.Lock()
-    s.isDay = s.astro.IsDay(time.Now())
-    s.dayMu.Unlock()
 
     log.Info().Str("mpgs_url", s.cfg.MPGS.BaseURL).Msg("Service started")
 
-    go s.astro.WatchDayNight(func(newState bool) {
-        s.dayMu.Lock()
-        s.isDay = newState
-        s.dayMu.Unlock()
-        s.tick(ctx, true)
-    })
-
-    ticker := time.NewTicker(2 * time.Second)
-    defer ticker.Stop()
-
+    go func() {
+        ticker := time.NewTicker(30 * time.Second)
+        defer ticker.Stop()
+        for range ticker.C {
+            s.tick(ctx, true)
+        }
+    }()
+	
     for {
         select {
         case <-ctx.Done():
@@ -1117,7 +1118,7 @@ func (s *Service) tick(ctx context.Context, forceSend bool) {
     currentDayState := s.isDay
     s.dayMu.RUnlock()
 
-    payloads, changed := s.processor.Process(data, s.cfg, currentDayState)
+    payloads, changed := s.processor.Process(data, s.cfg)
     if !changed && !forceSend { return }
 
     if changed {
@@ -1955,7 +1956,6 @@ func (ws *WebServer) handleSaveConfig(w http.ResponseWriter, r *http.Request) {
                 zone := s.BelongArea
                 if zone == "" { zone = "unknown" }
                 zoneFree[zone]++
-
                 floor := s.MapName
                 if floor == "" { floor = "unknown" }
                 floorFree[floor]++
@@ -1966,55 +1966,52 @@ func (ws *WebServer) handleSaveConfig(w http.ResponseWriter, r *http.Request) {
             if table.Mode != "push" {
                 continue
             }
-
             payload := map[string]interface{}{
-                "type":     "strs",
-                "version":  1,
-                "datetime": time.Now().Unix(),
-                "pattern":  0,
-                "is_day":   true,
+                "type": "strs", "version": 1, "datetime": time.Now().Unix(), "pattern": 0,
+                "is_day": isDaytime(),
             }
-
-            if table.Row1 != nil && (len(table.Row1.Zones) > 0 || len(table.Row1.Floors) > 0) {
-                cnt := countFree(zoneFree, floorFree, table.Row1.Zones, table.Row1.Floors)
+            if table.Row1 != nil {
+                cnt := countFreeConfig(zoneFree, floorFree, table.Row1.Zones, table.Row1.Floors)
                 payload["str1"] = map[string]string{"text": fmt.Sprintf("%d", cnt), "img": table.Row1.Img}
             }
-            if table.Row2 != nil && (len(table.Row2.Zones) > 0 || len(table.Row2.Floors) > 0) {
-                cnt := countFree(zoneFree, floorFree, table.Row2.Zones, table.Row2.Floors)
+            if table.Row2 != nil {
+                cnt := countFreeConfig(zoneFree, floorFree, table.Row2.Zones, table.Row2.Floors)
                 payload["str2"] = map[string]string{"text": fmt.Sprintf("%d", cnt), "img": table.Row2.Img}
             }
-            if table.Row3 != nil && (len(table.Row3.Zones) > 0 || len(table.Row3.Floors) > 0) {
-                cnt := countFree(zoneFree, floorFree, table.Row3.Zones, table.Row3.Floors)
+            if table.Row3 != nil {
+                cnt := countFreeConfig(zoneFree, floorFree, table.Row3.Zones, table.Row3.Floors)
                 payload["str3"] = map[string]string{"text": fmt.Sprintf("%d", cnt), "img": table.Row3.Img}
             }
-            if table.Row4 != nil && (len(table.Row4.Zones) > 0 || len(table.Row4.Floors) > 0) {
-                cnt := countFree(zoneFree, floorFree, table.Row4.Zones, table.Row4.Floors)
+            if table.Row4 != nil {
+                cnt := countFreeConfig(zoneFree, floorFree, table.Row4.Zones, table.Row4.Floors)
                 payload["str4"] = map[string]string{"text": fmt.Sprintf("%d", cnt), "img": table.Row4.Img}
             }
 
             payloadJSON, _ := json.Marshal(payload)
             url := fmt.Sprintf("http://%s:%d/places", table.IP, table.Port)
-
             client := &http.Client{Timeout: 5 * time.Second}
             httpReq, _ := http.NewRequest("POST", url, strings.NewReader(string(payloadJSON)))
             httpReq.Header.Set("Content-Type", "application/json")
             httpReq.Header.Set("Connection", "close")
-
             resp, err := client.Do(httpReq)
             if err != nil {
-                log.Error().Err(err).Str("ip", table.IP).Msg("Send after config save failed")
+                log.Error().Err(err).Str("ip", table.IP).Msg("Send failed")
             } else {
                 body, _ := io.ReadAll(resp.Body)
                 resp.Body.Close()
-                log.Info().Str("ip", table.IP).Int("status", resp.StatusCode).Str("response", string(body)).Msg("Sent to table after config save")
+                log.Info().Str("ip", table.IP).Int("status", resp.StatusCode).Str("response", string(body)).Msg("Sent to table")
             }
         }
     }()
 
-    respondJSON(w, map[string]interface{}{
-        "success": true,
-        "message": "Config saved. MPGS fetch and table update triggered.",
-    })
+    respondJSON(w, map[string]interface{}{"success": true, "message": "Config saved"})
+}
+
+func countFreeConfig(zoneFree, floorFree map[string]int, zones, floors []string) int {
+    count := 0
+    for _, z := range zones { count += zoneFree[z] }
+    for _, f := range floors { count += floorFree[f] }
+    return count
 }
 
 func respondJSON(w http.ResponseWriter, data interface{}) {
@@ -2071,7 +2068,7 @@ create_config() {
     "key": "${MPGS_KEY}",
     "secret": "${MPGS_SECRET}",
     "version": "${MPGS_VERSION}",
-    "timeout_sec": 5
+    "timeout_sec": 2
   },
   "navigation": {
     "url": "http://navi.internal/update",

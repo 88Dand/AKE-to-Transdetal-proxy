@@ -1548,10 +1548,9 @@ func buildIndexHTML(cfg *Config) string {
                 var selectedFloors = getCheckedValues(i, j, 'floor');
                 var hasSelection = selectedZones.length > 0 || selectedFloors.length > 0;
                 
-                // Отправляем только если выбраны чекбоксы (текст может быть 0)
-                if (hasSelection) {
+                if (hasSelection && textVal !== "") {
                     data["row" + j] = {
-                        text: textVal || "0",
+                        text: textVal,
                         img: imgVal
                     };
                     hasAnyRow = true;
@@ -1648,14 +1647,15 @@ func buildIndexHTML(cfg *Config) string {
                     var selectedFloors = getCheckedValues(i, j, 'floor');
                     var hasSelection = selectedZones.length > 0 || selectedFloors.length > 0;
                     
-                    if (hasSelection) {
+                    if (hasSelection && textVal !== "") {
                         table["row" + j] = {
-                            text: textVal || "0",
+                            text: textVal,
                             img: imgVal,
                             zones: selectedZones,
                             floors: selectedFloors
                         };
                     }
+                }
                 tables.push(table);
             }
             var config = {

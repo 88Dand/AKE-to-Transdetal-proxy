@@ -1042,11 +1042,11 @@ import (
 )
 
 type Service struct {
-    cfg         *Config
-    fetcher     *MPGSFetcher
-    processor   *Processor
-    sender      *TableSender
-    astro       *SunCalc
+    cfg       *Config
+    fetcher   *MPGSFetcher
+    processor *Processor
+    sender    *TableSender
+    astro     *SunCalc
     isDay       bool
     dayMu       sync.RWMutex
     fetchErrors int
@@ -1056,9 +1056,9 @@ func New(cfg *Config) *Service {
     return &Service{
         cfg:       cfg,
         fetcher:   NewMPGSFetcher(cfg.MPGS.BaseURL, cfg.MPGS.Key, cfg.MPGS.Secret, cfg.MPGS.Version, cfg.MPGS.Timeout),
-        processor: processor.NewProcessor(),
-        sender:    sender.NewTableSender(2),
-        astro:     astro.NewSunCalc(cfg.Location.Lat, cfg.Location.Lon),
+        processor: NewProcessor(),
+        sender:    NewTableSender(2),
+        astro:     NewSunCalc(cfg.Location.Lat, cfg.Location.Lon),
         isDay:     true,
     }
 }

@@ -1500,6 +1500,7 @@ func buildIndexHTML(cfg *Config) string {
         }
         
         function testTable(i) {
+            // Автообновление из MPGS
             if (lastMPGSData && lastMPGSData.spaces) {
                 for (var j = 1; j <= 4; j++) {
                     var textElem = document.getElementById("table_" + i + "_row" + j + "_text");
@@ -1535,7 +1536,13 @@ func buildIndexHTML(cfg *Config) string {
                 var imgElem = document.getElementById("table_" + i + "_row" + j + "_img");
                 var textVal = textElem ? textElem.value.trim() : "";
                 
-                if (textVal !== "") {
+                // Проверяем, есть ли выбранные чекбоксы для этой строки
+                var selectedZones = getCheckedValues(i, j, 'zone');
+                var selectedFloors = getCheckedValues(i, j, 'floor');
+                var hasSelection = selectedZones.length > 0 || selectedFloors.length > 0;
+                
+                // Отправляем строку только если есть выбранные чекбоксы И текст не пустой
+                if (hasSelection && textVal !== "") {
                     data["row" + j] = {
                         text: textVal,
                         img: imgElem ? imgElem.value : ""
@@ -1545,7 +1552,7 @@ func buildIndexHTML(cfg *Config) string {
             }
             
             if (!hasAnyRow) {
-                document.getElementById("table_" + i + "_result").innerHTML = "<pre style='color:orange'>No rows to send (all text fields are empty)</pre>";
+                document.getElementById("table_" + i + "_result").innerHTML = "<pre style='color:orange'>No rows to send (no checkboxes selected)</pre>";
                 return;
             }
             
@@ -1629,12 +1636,16 @@ func buildIndexHTML(cfg *Config) string {
                     var imgElem = document.getElementById("table_" + i + "_row" + j + "_img");
                     var textVal = textElem ? textElem.value.trim() : "";
                     
-                    if (textVal !== "" || (imgElem && imgElem.value)) {
+                    var selectedZones = getCheckedValues(i, j, 'zone');
+                    var selectedFloors = getCheckedValues(i, j, 'floor');
+                    var hasSelection = selectedZones.length > 0 || selectedFloors.length > 0;
+                    
+                    if (hasSelection && textVal !== "") {
                         table["row" + j] = {
                             text: textVal,
                             img: imgElem ? imgElem.value : "",
-                            zones: getCheckedValues(i, j, 'zone'),
-                            floors: getCheckedValues(i, j, 'floor')
+                            zones: selectedZones,
+                            floors: selectedFloors
                         };
                     }
                 }

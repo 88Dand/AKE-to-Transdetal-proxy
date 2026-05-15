@@ -913,6 +913,10 @@ func (p *Processor) Process(data []SpaceInfo, cfg *Config) (map[string]TablePayl
             payload.Str4 = &Row{Img: t.Row4.Img, Text: fmt.Sprintf("%d", free)}
             hasAnyRow = true
         }
+        if hasAnyRow {
+            result[t.IP] = payload
+        }
+    }
     return result, changed
 }
 
@@ -926,7 +930,6 @@ func countFreeSpaces(zoneFree, floorFree map[string]int, zones, floors []string)
         count += floorFree[f]
     }
     return count
-	
 }
 func isDaytime() bool {
     cfg := Get()

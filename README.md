@@ -3,5 +3,7 @@
 Настраиваются IP обоих сервисов
 также существует вебморда для настройки по адресу:
 http://IP:8080/
+
 Запуск:
-wget -qO- https://raw.githubusercontent.com/DanielLavrushin/b4/main/install.sh | bash
+
+curl -fsSL https://raw.githubusercontent.com/88Dand/AKE-to-Transdetal-proxy/blob/main/parking-proxy-install.sh | bash

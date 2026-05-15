@@ -10,4 +10,4 @@ http://IP:8080/
 
 Запуск:
 
-curl -fsSL https://raw.githubusercontent.com/88Dand/AKE-to-Transdetal-proxy/main/parking-proxy-install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/88Dand/AKE-to-Transdetal-proxy/main/parking-proxy-install.sh | tr -d '\r' | bash

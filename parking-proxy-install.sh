@@ -139,20 +139,17 @@ check_system() {
 
 configure_repos() {
     print_step "Настройка репозиториев CentOS ${CENTOS_VERSION}"
-    
-    # Проверка доступности репозиториев
-    print_status "Проверка репозиториев..."
-    if ! yum repolist 2>/dev/null | grep -q "base"; then
-        print_warning "Стандартные репозитории недоступны, настраиваем Vault..."
-        
-        # Резервное копирование
-        if [ -d /etc/yum.repos.d ]; then
-            mkdir -p /etc/yum.repos.d/backup_$(date +%Y%m%d)
-            mv /etc/yum.repos.d/*.repo /etc/yum.repos.d/backup_$(date +%Y%m%d)/ 2>/dev/null || true
-        fi
-        
-        # Создание Vault-репозитория
-        cat > /etc/yum.repos.d/CentOS-Vault.repo << 'REPOEOF'
+
+    print_status "Отключение стандартных репозиториев и настройка Vault..."
+
+    # Резервное копирование
+    if [ -d /etc/yum.repos.d ]; then
+        mkdir -p /etc/yum.repos.d/backup_$(date +%Y%m%d)
+        mv /etc/yum.repos.d/*.repo /etc/yum.repos.d/backup_$(date +%Y%m%d)/ 2>/dev/null || true
+    fi
+
+    # Создание Vault-репозитория
+    cat > /etc/yum.repos.d/CentOS-Vault.repo << 'REPOEOF'
 [C7-base]
 name=CentOS-7 - Base
 baseurl=http://vault.centos.org/centos/7/os/$basearch/
@@ -171,13 +168,10 @@ baseurl=http://vault.centos.org/centos/7/extras/$basearch/
 enabled=1
 gpgcheck=0
 REPOEOF
-        
-        yum clean all >> "$LOG_FILE" 2>&1
-        yum makecache >> "$LOG_FILE" 2>&1
-        print_success "Репозитории Vault настроены"
-    else
-        print_success "Репозитории доступны"
-    fi
+
+    yum clean all >> "$LOG_FILE" 2>&1
+    yum makecache >> "$LOG_FILE" 2>&1
+    print_success "Репозитории Vault настроены"
 }
 
 ###############################################################################

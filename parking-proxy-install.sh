@@ -1259,16 +1259,16 @@ func buildIndexHTML(cfg *Config) string {
             <div id="tables_container">%s</div>
             <button class="success" onclick="addTable()">+ Добавить табло</button>
             <br><br>
-            <button onclick="saveConfig()">Сохранить конфиг</button>
-            <div id="save_result" class="result"></div>
-        </div>
-        <div class="block">
             <h2>Настройки день/ночь</h2>
             <div class="row">
                 <div class="col"><div class="form-group"><label>Час начала дня (is_day: true)</label><input type="number" id="sunrise_hour" value="%d" min="0" max="23"></div></div>
                 <div class="col"><div class="form-group"><label>Час начала ночи (is_day: false)</label><input type="number" id="sunset_hour" value="%d" min="0" max="23"></div></div>
             </div>
-            <button onclick="saveDayNight()">Сохранить</button>
+            <button onclick="saveConfig()">Сохранить конфиг</button>
+            <div id="save_result" class="result"></div>
+        </div>
+        <div class="block">
+
             <div id="daynight_result" class="result"></div>
         </div>
     </div>
@@ -1588,37 +1588,7 @@ func buildIndexHTML(cfg *Config) string {
             }
         }
 
-        function saveDayNight() {
-            var config = {
-                mpgs: { base_url: document.getElementById("mpgs_url").value, key: document.getElementById("mpgs_key").value, secret: document.getElementById("mpgs_secret").value, version: "V3.6.0", timeout_sec: parseInt(document.getElementById("mpgs_timeout").value) },
-                location: { lat: 55.7558, lon: 37.6173 },
-                log_level: "debug",
-                sunrise_hour: parseInt(document.getElementById("sunrise_hour").value),
-                sunset_hour: parseInt(document.getElementById("sunset_hour").value),
-                tables: []
-            };
-            for (var i = 0; i < tablesCount; i++) {
-                var ipElem = document.getElementById("table_" + i + "_ip");
-                if (!ipElem) continue;
-                var pattern = parseInt(document.getElementById("table_" + i + "_pattern").value);
-                var maxRows = getMaxRows(pattern);
-                var table = { ip: ipElem.value, port: parseInt(document.getElementById("table_" + i + "_port").value), mode: "push", pattern: pattern };
-                for (var j = 1; j <= maxRows; j++) {
-                    var textElem = document.getElementById("table_" + i + "_row" + j + "_text");
-                    var imgElem = document.getElementById("table_" + i + "_row" + j + "_img");
-                    if (textElem && textElem.value.trim()) {
-                        var imgVal = imgElem ? imgElem.value : "";
-                        table["row" + j] = { text: textElem.value.trim(), img: imgVal === "-" ? "" : imgVal, zones: getCheckedValues(i, j, 'zone'), floors: getCheckedValues(i, j, 'floor') };
-                    }
-                }
-                config.tables.push(table);
-            }
-            fetch("/api/save-config", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(config) })
-            .then(function(r) { return r.json(); })
-            .then(function(result) { document.getElementById("daynight_result").innerHTML = "<pre>" + JSON.stringify(result, null, 2) + "</pre>"; });
-        }
-
-        testMPGS();
+         testMPGS();
         setTimeout(loadSavedCheckboxes, 3000);
     </script>
 </body>

@@ -2,7 +2,7 @@
 ###############################################################################
 # ParkingProxy - Complete Installation Script
 # Версия: 5.1.0
-# Описание: Автоматическое развёртывание Parking Proxy
+# Описание: Автоматическое развёртывание RPS for Yandex
 ###############################################################################
 
 set -o pipefail
@@ -1208,7 +1208,7 @@ func buildIndexHTML(cfg *Config) string {
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Parking Proxy</title>
+    <title>RPS for Yandex</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: Arial, sans-serif; background: #f0f2f5; padding: 20px; }
@@ -1245,7 +1245,7 @@ func buildIndexHTML(cfg *Config) string {
 </head>
 <body>
     <div class="container">
-        <div class="header"><h1>Parking Proxy</h1><p>MPGS: %s | Табло: %d</p></div>
+        <div class="header"><h1>RPS for Yandex</h1><p>MPGS: %s | Табло: %d</p></div>
         <div class="block">
             <h2>MPGS API</h2>
             <div class="row">
@@ -1871,7 +1871,7 @@ create_service() {
     print_step "Создание systemd-сервиса"
     cat > "/etc/systemd/system/${SERVICE_NAME}.service" << EOF
 [Unit]
-Description=Parking Proxy Service
+Description=RPS for Yandex Service
 After=network.target
 
 [Service]
@@ -1925,7 +1925,7 @@ create_scripts() {
     print_step "Создание скриптов обслуживания"
     cat > "$PROJECT_DIR/check.sh" << 'CHECKEOF'
 #!/bin/bash
-echo "=== Parking Proxy Diagnostics ==="
+echo "=== RPS for Yandex Diagnostics ==="
 echo ""
 echo "Service Status:"
 systemctl status parking-proxy --no-pager -l | head -15
@@ -1987,7 +1987,7 @@ main() {
     clear
     echo ""
     echo "============================================="
-    echo "  Parking Proxy Installation Script v5.1.0"
+    echo "  RPS for Yandex Installation Script v5.1.0"
     echo "============================================="
     echo ""
     mkdir -p "$PROJECT_DIR"

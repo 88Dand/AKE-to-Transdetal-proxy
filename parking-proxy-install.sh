@@ -403,10 +403,6 @@ type MPGSConfig struct {
     Timeout int    `json:"timeout_sec"`
 }
 
-type NavigationConfig struct {
-    URL     string `json:"url"`
-    Timeout int    `json:"timeout_sec"`
-}
 
 type TableConfig struct {
     IP      string     `json:"ip"`
@@ -433,7 +429,6 @@ type Location struct {
 
 type Config struct {
     MPGS         MPGSConfig       `json:"mpgs"`
-    Navigation   NavigationConfig `json:"navigation"`
     Tables       []TableConfig    `json:"tables"`
     Location     Location         `json:"location"`
     LogLevel     string           `json:"log_level"`
@@ -1557,7 +1552,6 @@ func buildIndexHTML(cfg *Config) string {
             }
             var config = {
                 mpgs: { base_url: document.getElementById("mpgs_url").value, key: document.getElementById("mpgs_key").value, secret: document.getElementById("mpgs_secret").value, version: "V3.6.0", timeout_sec: parseInt(document.getElementById("mpgs_timeout").value) },
-                navigation: { url: "http://navi.internal/update", timeout_sec: 2 },
                 location: { lat: 55.7558, lon: 37.6173 },
                 log_level: "debug",
                 sunrise_hour: parseInt(document.getElementById("sunrise_hour").value),
@@ -1597,7 +1591,6 @@ func buildIndexHTML(cfg *Config) string {
         function saveDayNight() {
             var config = {
                 mpgs: { base_url: document.getElementById("mpgs_url").value, key: document.getElementById("mpgs_key").value, secret: document.getElementById("mpgs_secret").value, version: "V3.6.0", timeout_sec: parseInt(document.getElementById("mpgs_timeout").value) },
-                navigation: { url: "http://navi.internal/update", timeout_sec: 2 },
                 location: { lat: 55.7558, lon: 37.6173 },
                 log_level: "debug",
                 sunrise_hour: parseInt(document.getElementById("sunrise_hour").value),
@@ -1851,7 +1844,6 @@ create_config() {
     cat > "$CONFIG_DIR/config.json" << EOF
 {
   "mpgs": { "base_url": "${MPGS_BASE_URL}", "key": "${MPGS_KEY}", "secret": "${MPGS_SECRET}", "version": "${MPGS_VERSION}", "timeout_sec": 2 },
-  "navigation": { "url": "http://navi.internal/update", "timeout_sec": 2 },
   "location": { "lat": 55.7558, "lon": 37.6173 },
   "log_level": "debug",
   "sunrise_hour": 7,

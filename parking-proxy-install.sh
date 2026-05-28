@@ -1921,38 +1921,6 @@ start_service() {
     fi
 }
 
-create_scripts() {
-    print_step "Создание скриптов обслуживания"
-    cat > "$PROJECT_DIR/check.sh" << 'CHECKEOF'
-#!/bin/bash
-echo "=== RPS for Yandex Diagnostics ==="
-echo ""
-echo "Service Status:"
-systemctl status parking-proxy --no-pager -l | head -15
-echo ""
-echo "Last 30 log entries:"
-journalctl -u parking-proxy -n 30 --no-pager
-echo ""
-echo "Process:"
-ps aux | grep parking-proxy | grep -v grep
-CHECKEOF
-    chmod +x "$PROJECT_DIR/check.sh"
-
-    cat > "$PROJECT_DIR/restart.sh" << 'RESTARTEOF'
-#!/bin/bash
-systemctl restart parking-proxy
-sleep 2
-journalctl -u parking-proxy -n 15 --no-pager
-RESTARTEOF
-    chmod +x "$PROJECT_DIR/restart.sh"
-
-    cat > "$PROJECT_DIR/logs.sh" << 'LOGSEOF'
-#!/bin/bash
-journalctl -u parking-proxy -f
-LOGSEOF
-    chmod +x "$PROJECT_DIR/logs.sh"
-    print_success "Скрипты созданы: check.sh, restart.sh, logs.sh"
-}
 
 show_summary() {
     echo ""
@@ -1967,9 +1935,6 @@ show_summary() {
     echo ""
     echo -e "${CYAN}Управление:${NC}"
     echo "  Статус:    systemctl status $SERVICE_NAME"
-    echo "  Логи:      $PROJECT_DIR/logs.sh"
-    echo "  Проверка:  $PROJECT_DIR/check.sh"
-    echo "  Перезапуск: $PROJECT_DIR/restart.sh"
     echo "  Веб:       http://$(hostname -I | awk '{print $1}'):${WEB_PORT}"
     echo ""
     echo -e "${CYAN}Конфигурация:${NC}"
@@ -2006,7 +1971,6 @@ main() {
     create_service
     check_firewall
     start_service
-    create_scripts
     show_summary
 
     echo ""

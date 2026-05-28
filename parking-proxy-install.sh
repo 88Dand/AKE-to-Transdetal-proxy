@@ -1,7 +1,7 @@
 #!/bin/bash
 ###############################################################################
 # ParkingProxy - Complete Installation Script
-# Версия: 4.1.1
+# Версия: 5.0.0
 # Описание: Автоматическое развёртывание Parking Proxy
 ###############################################################################
 
@@ -80,14 +80,14 @@ print_info() {
 
 check_system() {
     print_step "Проверка системы"
-    
+
     print_status "Проверка прав root..."
     if [[ $EUID -ne 0 ]]; then
         print_error "Скрипт должен запускаться от root"
         exit 1
     fi
     print_success "Права root подтверждены"
-    
+
     print_status "Определение операционной системы..."
     if [ -f /etc/centos-release ]; then
         CENTOS_VERSION=$(rpm -q --queryformat '%{VERSION}' centos-release 2>/dev/null | cut -d. -f1)
@@ -100,7 +100,7 @@ check_system() {
         CENTOS_VERSION="7"
     fi
     print_info "ОС: CentOS ${CENTOS_VERSION}"
-    
+
     print_status "Проверка архитектуры..."
     ARCH=$(uname -m)
     if [ "$ARCH" != "x86_64" ]; then
@@ -108,7 +108,7 @@ check_system() {
         exit 1
     fi
     print_success "Архитектура: ${ARCH}"
-    
+
     print_status "Проверка свободного места..."
     FREE_SPACE=$(df -m /opt 2>/dev/null | tail -1 | awk '{print $4}')
     if [ -z "$FREE_SPACE" ] || [ "$FREE_SPACE" -lt 100 ]; then
@@ -119,7 +119,7 @@ check_system() {
         exit 1
     fi
     print_success "Свободно: ${FREE_SPACE}MB"
-    
+
     print_status "Проверка сети..."
     if ping -c 1 -W 2 8.8.8.8 > /dev/null 2>&1; then
         print_success "Сеть доступна"
@@ -173,9 +173,9 @@ REPOEOF
 
 install_deps() {
     print_step "Установка системных зависимостей"
-    
+
     PACKAGES=("curl" "wget" "git" "gcc" "make" "tar")
-    
+
     for pkg in "${PACKAGES[@]}"; do
         if rpm -q "$pkg" > /dev/null 2>&1; then
             print_success "$pkg уже установлен"
@@ -197,7 +197,7 @@ install_deps() {
 
 install_golang() {
     print_step "Установка Go ${GO_VERSION}"
-    
+
     if command -v go &> /dev/null; then
         CURRENT_GO=$(go version | grep -oP 'go\K[0-9.]+')
         if [ "$CURRENT_GO" = "$GO_VERSION" ]; then
@@ -206,10 +206,10 @@ install_golang() {
         fi
         print_info "Обновление с ${CURRENT_GO} до ${GO_VERSION}"
     fi
-    
+
     cd /tmp
     GO_TAR="go${GO_VERSION}.${GO_ARCH}.tar.gz"
-    
+
     if [ ! -f "$GO_TAR" ]; then
         print_status "Скачивание Go..."
         wget --timeout=30 --tries=3 "https://go.dev/dl/${GO_TAR}" -O "$GO_TAR" 2>&1 | tee -a "$LOG_FILE"
@@ -219,22 +219,22 @@ install_golang() {
         fi
     fi
     print_success "Go скачан"
-    
+
     print_status "Установка..."
     rm -rf /usr/local/go
     tar -C /usr/local -xzf "$GO_TAR" 2>&1 | tee -a "$LOG_FILE"
-    
+
     if ! grep -q "/usr/local/go/bin" /etc/profile; then
         echo 'export PATH=$PATH:/usr/local/go/bin' >> /etc/profile
         echo 'export GOPATH=/root/go' >> /etc/profile
         echo 'export PATH=$PATH:$GOPATH/bin' >> /etc/profile
     fi
-    
+
     export PATH=$PATH:/usr/local/go/bin
     export GOPATH=/root/go
     export PATH=$PATH:$GOPATH/bin
     mkdir -p "$GOPATH"
-    
+
     if go version >> "$LOG_FILE" 2>&1; then
         print_success "Go установлен: $(go version)"
     else
@@ -249,23 +249,24 @@ install_golang() {
 
 create_structure() {
     print_step "Создание структуры проекта"
-    
+
     if [ ! -d "$PROJECT_DIR" ]; then
         print_status "Создание каталога $PROJECT_DIR..."
         mkdir -p "$PROJECT_DIR"
         print_success "Каталог $PROJECT_DIR создан"
     fi
-    
+
     cd "$PROJECT_DIR" || {
         print_error "Не удалось перейти в $PROJECT_DIR"
         exit 1
     }
-    
+
     if systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
         print_status "Остановка старого сервиса..."
         systemctl stop "$SERVICE_NAME"
         print_success "Старый сервис остановлен"
     fi
+
     if [ -f "/etc/systemd/system/${SERVICE_NAME}.service" ]; then
         print_status "Удаление старого сервиса..."
         systemctl disable "$SERVICE_NAME" >> "$LOG_FILE" 2>&1
@@ -277,11 +278,11 @@ create_structure() {
     print_status "Создание директорий..."
     mkdir -p "$CONFIG_DIR"
     mkdir -p /var/log/parking
-    
+
     rm -f ./*.go
     rm -f ./go.mod
     rm -f ./go.sum
-    
+
     print_success "Структура создана в $PROJECT_DIR"
 }
 
@@ -291,12 +292,10 @@ create_structure() {
 
 create_files() {
     print_step "Создание файлов проекта"
-    
+
     cd "$PROJECT_DIR"
-    
-    # -------------------------------------------------------------------------
+
     # go.mod
-    # -------------------------------------------------------------------------
     print_status "Создание go.mod..."
     cat > "$PROJECT_DIR/go.mod" << 'GOMOD'
 module parking-proxy
@@ -305,7 +304,6 @@ go 1.22
 
 require (
 	github.com/fsnotify/fsnotify v1.7.0
-	github.com/nathan-osman/go-sunrise v1.1.0
 	github.com/rs/zerolog v1.33.0
 )
 
@@ -318,9 +316,7 @@ require (
 GOMOD
     print_success "go.mod создан"
 
-    # -------------------------------------------------------------------------
     # main.go
-    # -------------------------------------------------------------------------
     print_status "Создание main.go..."
     cat > "$PROJECT_DIR/main.go" << 'MAINEOF'
 package main
@@ -379,12 +375,11 @@ func main() {
 
     log.Info().Msg("Application stopped")
 }
+
 MAINEOF
     print_success "main.go создан"
 
-    # -------------------------------------------------------------------------
     # config.go
-    # -------------------------------------------------------------------------
     print_status "Создание config.go..."
     cat > "$PROJECT_DIR/config.go" << 'CONFIGEOF'
 package main
@@ -444,37 +439,6 @@ type Config struct {
     LogLevel     string           `json:"log_level"`
     SunriseHour  int              `json:"sunrise_hour"`
     SunsetHour   int              `json:"sunset_hour"`
-}
-
-// maxRowsForPattern returns the maximum number of rows allowed for a given pattern.
-// pattern 0 -> 4 rows, pattern 1 -> 3 rows (str1..str3), pattern 2 -> 1 row (str1 only).
-func maxRowsForPattern(pattern int) int {
-    switch pattern {
-    case 1:
-        return 3
-    case 2:
-        return 1
-    default:
-        return 4
-    }
-}
-
-// imgAllowedForPattern returns true when img value is valid for the given pattern.
-// pattern 0/1: car, ecar, moto, 2car
-// pattern 2  : car, ecar, moto, 2car, arrow_up, arrow_down, arrow_left, arrow_right
-func imgAllowedForPattern(img string, pattern int) bool {
-    base := map[string]bool{"car": true, "ecar": true, "moto": true, "2car": true}
-    if base[img] {
-        return true
-    }
-    if pattern == 2 {
-        arrows := map[string]bool{
-            "arrow_up": true, "arrow_down": true,
-            "arrow_left": true, "arrow_right": true,
-        }
-        return arrows[img]
-    }
-    return false
 }
 
 var (
@@ -570,26 +534,13 @@ func (c *Config) Validate() error {
         if t.Mode != "push" && t.Mode != "pull" {
             return fmt.Errorf("table %d: mode must be 'push' or 'pull'", i)
         }
-        if t.Pattern < 0 || t.Pattern > 2 {
-            return fmt.Errorf("table %d: pattern must be 0, 1 or 2", i)
-        }
-        maxRows := maxRowsForPattern(t.Pattern)
-        rows := []*RowConfig{t.Row1, t.Row2, t.Row3, t.Row4}
-        for j := maxRows; j < 4; j++ {
-            if rows[j] != nil {
-                return fmt.Errorf("table %d: pattern %d allows max %d rows, but row%d is defined",
-                    i, t.Pattern, maxRows, j+1)
-            }
-        }
-        for j := 0; j < maxRows; j++ {
-            r := rows[j]
-            if r == nil {
-                continue
-            }
-            if r.Img != "" && !imgAllowedForPattern(r.Img, t.Pattern) {
-                return fmt.Errorf("table %d row%d: img '%s' not allowed for pattern %d",
-                    i, j+1, r.Img, t.Pattern)
-            }
+        rowCount := 0
+        if t.Row1 != nil { rowCount++ }
+        if t.Row2 != nil { rowCount++ }
+        if t.Row3 != nil { rowCount++ }
+        if t.Row4 != nil { rowCount++ }
+        if rowCount > 4 {
+            return fmt.Errorf("table %d has more than 4 rows defined", i)
         }
     }
     return nil
@@ -603,9 +554,7 @@ func Get() *Config {
 CONFIGEOF
     print_success "config.go создан"
 
-    # -------------------------------------------------------------------------
     # mpgs.go
-    # -------------------------------------------------------------------------
     print_status "Создание mpgs.go..."
     cat > "$PROJECT_DIR/mpgs.go" << 'FETCHEREOF'
 package main
@@ -766,56 +715,11 @@ func (f *MPGSFetcher) Fetch(ctx context.Context) ([]SpaceInfo, error) {
     log.Debug().Int("count", listResp.Count).Msg("Fetched parking spaces")
     return listResp.List, nil
 }
+
 FETCHEREOF
     print_success "mpgs.go создан"
 
-    # -------------------------------------------------------------------------
-    # astro.go
-    # -------------------------------------------------------------------------
-    print_status "Создание astro.go..."
-    cat > "$PROJECT_DIR/astro.go" << 'ASTROEOF'
-package main
-
-import (
-    "time"
-
-    "github.com/nathan-osman/go-sunrise"
-    "github.com/rs/zerolog/log"
-)
-
-type SunCalc struct {
-    Lat, Lon float64
-}
-
-func NewSunCalc(lat, lon float64) *SunCalc {
-    return &SunCalc{Lat: lat, Lon: lon}
-}
-
-func (s *SunCalc) IsDay(t time.Time) bool {
-    rise, set := sunrise.SunriseSunset(s.Lat, s.Lon, t.Year(), t.Month(), t.Day())
-    return t.After(rise) && t.Before(set)
-}
-
-func (s *SunCalc) WatchDayNight(onChange func(bool)) {
-    ticker := time.NewTicker(30 * time.Second)
-    lastState := s.IsDay(time.Now())
-    log.Info().Bool("is_day", lastState).Msg("Initial day/night state")
-
-    for range ticker.C {
-        currentState := s.IsDay(time.Now())
-        if currentState != lastState {
-            log.Info().Bool("new_state", currentState).Msg("Day/Night changed")
-            onChange(currentState)
-            lastState = currentState
-        }
-    }
-}
-ASTROEOF
-    print_success "astro.go создан"
-
-    # -------------------------------------------------------------------------
     # processor.go
-    # -------------------------------------------------------------------------
     print_status "Создание processor.go..."
     cat > "$PROJECT_DIR/processor.go" << 'PROCESSOREOF'
 package main
@@ -888,7 +792,6 @@ func (p *Processor) Process(data []SpaceInfo, cfg *Config) (map[string]TablePayl
     result := make(map[string]TablePayload)
 
     for _, t := range cfg.Tables {
-        maxRows := maxRowsForPattern(t.Pattern)
         payload := TablePayload{
             Type:    "strs",
             Version: 1,
@@ -897,37 +800,71 @@ func (p *Processor) Process(data []SpaceInfo, cfg *Config) (map[string]TablePayl
         }
 
         hasAnyRow := false
-        rows := []*RowConfig{t.Row1, t.Row2, t.Row3, t.Row4}
 
-        for j := 0; j < maxRows; j++ {
-            row := rows[j]
-            if row == nil || (len(row.Zones) == 0 && len(row.Floors) == 0) {
-                continue
-            }
-            free := countFreeSpaces(zoneFree, floorFree, row.Zones, row.Floors)
-            key := fmt.Sprintf("%s_row%d", t.IP, j+1)
+        if t.Row1 != nil && (len(t.Row1.Zones) > 0 || len(t.Row1.Floors) > 0) {
+            free := countFreeSpaces(zoneFree, floorFree, t.Row1.Zones, t.Row1.Floors)
+            key := fmt.Sprintf("%s_row1", t.IP)
             if old, ok := p.lastFreeCount[key]; !ok || old != free {
                 changed = true
             }
             p.lastFreeCount[key] = free
-            r := &Row{Img: row.Img, Text: fmt.Sprintf("%d", free)}
-            switch j {
-            case 0:
-                payload.Str1 = r
-            case 1:
-                payload.Str2 = r
-            case 2:
-                payload.Str3 = r
-            case 3:
-                payload.Str4 = r
+            row := &Row{Text: fmt.Sprintf("%d", free)}
+            if t.Row1.Img != "" {
+                row.Img = t.Row1.Img
             }
+            payload.Str1 = row
             hasAnyRow = true
         }
 
+        if t.Row2 != nil && (len(t.Row2.Zones) > 0 || len(t.Row2.Floors) > 0) {
+            free := countFreeSpaces(zoneFree, floorFree, t.Row2.Zones, t.Row2.Floors)
+            key := fmt.Sprintf("%s_row2", t.IP)
+            if old, ok := p.lastFreeCount[key]; !ok || old != free {
+                changed = true
+            }
+            p.lastFreeCount[key] = free
+            row := &Row{Text: fmt.Sprintf("%d", free)}
+            if t.Row2.Img != "" {
+                row.Img = t.Row2.Img
+            }
+            payload.Str2 = row
+            hasAnyRow = true
+        }
+
+        if t.Row3 != nil && (len(t.Row3.Zones) > 0 || len(t.Row3.Floors) > 0) {
+            free := countFreeSpaces(zoneFree, floorFree, t.Row3.Zones, t.Row3.Floors)
+            key := fmt.Sprintf("%s_row3", t.IP)
+            if old, ok := p.lastFreeCount[key]; !ok || old != free {
+                changed = true
+            }
+            p.lastFreeCount[key] = free
+            row := &Row{Text: fmt.Sprintf("%d", free)}
+            if t.Row3.Img != "" {
+                row.Img = t.Row3.Img
+            }
+            payload.Str3 = row
+            hasAnyRow = true
+        }
+
+        if t.Row4 != nil && (len(t.Row4.Zones) > 0 || len(t.Row4.Floors) > 0) {
+            free := countFreeSpaces(zoneFree, floorFree, t.Row4.Zones, t.Row4.Floors)
+            key := fmt.Sprintf("%s_row4", t.IP)
+            if old, ok := p.lastFreeCount[key]; !ok || old != free {
+                changed = true
+            }
+            p.lastFreeCount[key] = free
+            row := &Row{Text: fmt.Sprintf("%d", free)}
+            if t.Row4.Img != "" {
+                row.Img = t.Row4.Img
+            }
+            payload.Str4 = row
+            hasAnyRow = true
+        }
         if hasAnyRow {
             result[t.IP] = payload
         }
     }
+
     return result, changed
 }
 
@@ -948,21 +885,16 @@ func isDaytime() bool {
     sunrise := 7
     sunset := 18
     if cfg != nil {
-        if cfg.SunriseHour > 0 {
-            sunrise = cfg.SunriseHour
-        }
-        if cfg.SunsetHour > 0 {
-            sunset = cfg.SunsetHour
-        }
+        if cfg.SunriseHour > 0 { sunrise = cfg.SunriseHour }
+        if cfg.SunsetHour > 0 { sunset = cfg.SunsetHour }
     }
     return now.Hour() >= sunrise && now.Hour() < sunset
 }
+
 PROCESSOREOF
     print_success "processor.go создан"
 
-    # -------------------------------------------------------------------------
     # sender.go
-    # -------------------------------------------------------------------------
     print_status "Создание sender.go..."
     cat > "$PROJECT_DIR/sender.go" << 'SENDEREOF'
 package main
@@ -1051,9 +983,7 @@ func (s *TableSender) SendWithRetry(ctx context.Context, ip string, port int, pa
 SENDEREOF
     print_success "sender.go создан"
 
-    # -------------------------------------------------------------------------
     # service.go
-    # -------------------------------------------------------------------------
     print_status "Создание service.go..."
     cat > "$PROJECT_DIR/service.go" << 'SERVICEEOF'
 package main
@@ -1116,17 +1046,13 @@ func (s *Service) tick(ctx context.Context, forceSend bool) {
     if err != nil {
         s.fetchErrors++
         log.Error().Err(err).Int("errors", s.fetchErrors).Msg("Fetch failed")
-        if s.fetchErrors > 5 {
-            time.Sleep(8 * time.Second)
-        }
+        if s.fetchErrors > 5 { time.Sleep(8 * time.Second) }
         return
     }
     s.fetchErrors = 0
 
     payloads, changed := s.processor.Process(data, s.cfg)
-    if !changed && !forceSend {
-        return
-    }
+    if !changed && !forceSend { return }
 
     if changed {
         log.Info().Int("tables_to_update", len(payloads)).Msg("Parking data changed, updating tables")
@@ -1161,9 +1087,7 @@ func (s *Service) tick(ctx context.Context, forceSend bool) {
 SERVICEEOF
     print_success "service.go создан"
 
-    # -------------------------------------------------------------------------
-    # web.go  — ОСНОВНЫЕ ИЗМЕНЕНИЯ: логика pattern в UI
-    # -------------------------------------------------------------------------
+    # web.go
     print_status "Создание web.go..."
     cat > "$PROJECT_DIR/web.go" << 'WEBEOF'
 package main
@@ -1203,6 +1127,7 @@ func NewWebServer(addr, cfgPath string) *WebServer {
     mux.HandleFunc("/api/test-table", ws.handleTestTable)
 
     ws.srv.Handler = mux
+
     return ws
 }
 
@@ -1221,8 +1146,25 @@ func (ws *WebServer) handleIndex(w http.ResponseWriter, r *http.Request) {
         http.Error(w, "Config not loaded", 500)
         return
     }
+
     w.Header().Set("Content-Type", "text/html; charset=utf-8")
-    w.Write([]byte(buildIndexHTML(cfg)))
+    html := buildIndexHTML(cfg)
+    w.Write([]byte(html))
+}
+
+var imgOptions = []string{"-", "car", "ecar", "moto", "2car", "arrow_up", "arrow_down", "arrow_left", "arrow_right"}
+
+func buildImgSelect(id string, selected string) string {
+    html := fmt.Sprintf(`<select id="%s">`, id)
+    for _, img := range imgOptions {
+        sel := ""
+        if img == selected {
+            sel = " selected"
+        }
+        html += fmt.Sprintf(`<option value="%s"%s>%s</option>`, img, sel, img)
+    }
+    html += `</select>`
+    return html
 }
 
 func savedTablesJSON(cfg *Config) string {
@@ -1233,625 +1175,574 @@ func savedTablesJSON(cfg *Config) string {
 func buildIndexHTML(cfg *Config) string {
     tablesHTML := ""
     for i, t := range cfg.Tables {
-        tablesHTML += buildTableBlockHTML(i, t)
+        rowsHTML := ""
+        for j := 1; j <= 4; j++ {
+            var row *RowConfig
+            switch j {
+            case 1: row = t.Row1
+            case 2: row = t.Row2
+            case 3: row = t.Row3
+            case 4: row = t.Row4
+            }
+
+            textVal := ""
+            imgVal := ""
+            if row != nil {
+                textVal = row.Text
+                imgVal = row.Img
+            }
+
+            rowsHTML += fmt.Sprintf(`
+            <div class="row-data" id="table_%d_row%d_container">
+                <strong>Строка %d:</strong>
+                <button class="remove-btn danger" onclick="clearRow(%d, %d)" style="padding:2px 8px;font-size:12px">X</button>
+                Текст: <input id="table_%d_row%d_text" value="%s" style="width:80px" placeholder="0" type="number">
+                Изобр: %s
+                <div style="margin-top:5px">
+                    <strong>Зоны:</strong> <span id="table_%d_row%d_zones_display">-</span>
+                    <span style="margin-left:10px"><strong>Этажи:</strong> <span id="table_%d_row%d_floors_display">-</span></span>
+                </div>
+                <div class="checkbox-group">
+                    <div id="table_%d_row%d_zonecheckboxes" style="display:inline">Зоны: нет данных</div>
+                    <div id="table_%d_row%d_floorcheckboxes" style="display:inline;margin-left:10px">Этажи: нет данных</div>
+                </div>
+                <button onclick="updateRowValue(%d, %d)" style="background:#ff9800;padding:5px 10px;font-size:12px">Обновить из MPGS</button>
+            </div>`, i, j, j, i, j, i, j, textVal, buildImgSelect(fmt.Sprintf("table_%d_row%d_img", i, j), imgVal),
+                i, j, i, j, i, j, i, j, i, j)
+        }
+
+        tablesHTML += fmt.Sprintf(`
+        <div class="table-block" id="table_%d">
+            <button class="remove-btn danger" onclick="removeTable(%d)">X</button>
+            <h3>Табло %d</h3>
+            <div class="row">
+                <div class="col"><label>IP</label><input id="table_%d_ip" value="%s"></div>
+                <div class="col"><label>Порт</label><input id="table_%d_port" value="%d" type="number"></div>
+            </div>
+            <div class="form-group"><label>is_day</label><select id="table_%d_isday"><option value="true">true (день)</option><option value="false">false (ночь)</option></select></div>
+            <div id="table_%d_rows">%s</div>
+            <button onclick="testTable(%d)">Тест отправки</button>
+            <div id="table_%d_result" class="result"></div>
+        </div>`, i, i, i, i, t.IP, i, t.Port, i, i, rowsHTML, i, i)
     }
 
-    return fmt.Sprintf(`<!DOCTYPE html>
-<html lang="en">
+    html := fmt.Sprintf(`<!DOCTYPE html>
+<html lang="ru">
 <head>
-<meta charset="UTF-8">
-<title>Parking Proxy</title>
-<style>
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: Arial, sans-serif; background: #f0f2f5; padding: 20px; }
-.container { max-width: 1200px; margin: 0 auto; }
-.header { background: #1a73e8; color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
-.block { background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-.block h2 { color: #1a73e8; margin-bottom: 15px; border-bottom: 2px solid #1a73e8; padding-bottom: 10px; }
-.form-group { margin-bottom: 15px; }
-label { display: block; margin-bottom: 5px; font-weight: bold; }
-input, select { width: 100%%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
-.row { display: flex; gap: 15px; }
-.col { flex: 1; }
-button { background: #1a73e8; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; margin: 5px; }
-button:hover { background: #1557b0; }
-button.danger { background: #dc3545; }
-button.success { background: #28a745; }
-pre { background: #f4f4f4; padding: 15px; border-radius: 4px; overflow-x: auto; font-size: 12px; max-height: 600px; overflow-y: auto; white-space: pre-wrap; word-wrap: break-word; }
-.result { margin-top: 15px; }
-.table-block { border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; border-radius: 4px; }
-.remove-btn { float: right; }
-.row-data { background: #f8f9fa; padding: 10px; margin: 5px 0; border-radius: 4px; position: relative; }
-.row-data input, .row-data select { width: auto; display: inline; }
-.row-data.hidden { display: none; }
-.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin: 10px 0; }
-.stat-card { background: #e8f0fe; padding: 10px; border-radius: 4px; text-align: center; }
-.stat-card .value { font-size: 24px; font-weight: bold; color: #1a73e8; }
-.stat-card .label { font-size: 12px; color: #666; }
-table { width: 100%%; border-collapse: collapse; margin: 10px 0; }
-th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-th { background: #f0f0f0; }
-.checkbox-group { display: flex; flex-wrap: wrap; gap: 8px; margin: 5px 0; }
-.checkbox-group label { display: inline-flex; align-items: center; gap: 3px; font-weight: normal; cursor: pointer; font-size: 13px; }
-.checkbox-group input[type=checkbox] { width: auto; }
-.pattern-badge { display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 12px; font-weight: bold; margin-left: 8px; background: #e8f0fe; color: #1a73e8; }
-</style>
+    <meta charset="UTF-8">
+    <title>Parking Proxy</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: Arial, sans-serif; background: #f0f2f5; padding: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .header { background: #1a73e8; color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+        .block { background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .block h2 { color: #1a73e8; margin-bottom: 15px; border-bottom: 2px solid #1a73e8; padding-bottom: 10px; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input, select { width: 100%%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
+        .row { display: flex; gap: 15px; }
+        .col { flex: 1; }
+        button { background: #1a73e8; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; margin: 5px; }
+        button:hover { background: #1557b0; }
+        button.danger { background: #dc3545; }
+        button.success { background: #28a745; }
+        pre { background: #f4f4f4; padding: 15px; border-radius: 4px; overflow-x: auto; font-size: 12px; max-height: 600px; overflow-y: auto; white-space: pre-wrap; word-wrap: break-word; }
+        .result { margin-top: 15px; }
+        .table-block { border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; border-radius: 4px; }
+        .remove-btn { float: right; }
+        .row-data { background: #f8f9fa; padding: 10px; margin: 5px 0; border-radius: 4px; position: relative; }
+        .row-data input, .row-data select { width: auto; display: inline; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin: 10px 0; }
+        .stat-card { background: #e8f0fe; padding: 10px; border-radius: 4px; text-align: center; }
+        .stat-card .value { font-size: 24px; font-weight: bold; color: #1a73e8; }
+        .stat-card .label { font-size: 12px; color: #666; }
+        table { width: 100%%; border-collapse: collapse; margin: 10px 0; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background: #f0f0f0; }
+        .checkbox-group { display: flex; flex-wrap: wrap; gap: 8px; margin: 5px 0; }
+        .checkbox-group label { display: inline-flex; align-items: center; gap: 3px; font-weight: normal; cursor: pointer; font-size: 13px; }
+        .checkbox-group input[type=checkbox] { width: auto; }
+    </style>
 </head>
 <body>
-<div class="container">
-    <div class="header">
-        <h1>Parking Proxy</h1>
-        <p>MPGS: %s | Tables: %d</p>
-    </div>
-    <div class="block">
-        <h2>MPGS API</h2>
-        <div class="row">
-            <div class="col"><div class="form-group"><label>URL</label><input id="mpgs_url" value="%s"></div></div>
-            <div class="col"><div class="form-group"><label>Timeout (sec)</label><input type="number" id="mpgs_timeout" value="%d"></div></div>
+    <div class="container">
+        <div class="header">
+            <h1>Parking Proxy</h1>
+            <p>MPGS: %s | Табло: %d</p>
         </div>
-        <div class="row">
-            <div class="col"><div class="form-group"><label>Key</label><input id="mpgs_key" value="%s"></div></div>
-            <div class="col"><div class="form-group"><label>Secret</label><input id="mpgs_secret" value="%s"></div></div>
+        <div class="block">
+            <h2>MPGS API</h2>
+            <div class="row">
+                <div class="col"><div class="form-group"><label>URL</label><input id="mpgs_url" value="%s"></div></div>
+                <div class="col"><div class="form-group"><label>Таймаут (сек)</label><input type="number" id="mpgs_timeout" value="%d"></div></div>
+            </div>
+            <div class="row">
+                <div class="col"><div class="form-group"><label>Key</label><input id="mpgs_key" value="%s"></div></div>
+                <div class="col"><div class="form-group"><label>Secret</label><input id="mpgs_secret" value="%s"></div></div>
+            </div>
+            <button onclick="testMPGS()">Получить данные MPGS</button>
+            <div id="mpgs_result" class="result"></div>
         </div>
-        <button onclick="testMPGS()">Get MPGS Data</button>
-        <div id="mpgs_result" class="result"></div>
-    </div>
-    <div class="block">
-        <h2>Tables</h2>
-        <div id="tables_container">%s</div>
-        <button class="success" onclick="addTable()">+ Add Table</button>
-        <br><br>
-        <button onclick="saveConfig()">Save Config</button>
-        <div id="save_result" class="result"></div>
-    </div>
-    <div class="block">
-        <h2>Day/Night Settings</h2>
-        <div class="row">
-            <div class="col">
-                <div class="form-group">
-                    <label>Sunrise Hour (is_day: true from)</label>
-                    <input type="number" id="sunrise_hour" value="%d" min="0" max="23">
+        <div class="block">
+            <h2>Табло</h2>
+            <div id="tables_container">%s</div>
+            <button class="success" onclick="addTable()">+ Добавить табло</button>
+            <br><br>
+            <button onclick="saveConfig()">Сохранить конфиг</button>
+            <div id="save_result" class="result"></div>
+        </div>
+        <div class="block">
+            <h2>Настройки день/ночь</h2>
+            <div class="row">
+                <div class="col">
+                    <div class="form-group">
+                        <label>Час начала дня (is_day: true)</label>
+                        <input type="number" id="sunrise_hour" value="%d" min="0" max="23">
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="form-group">
+                        <label>Час начала ночи (is_day: false)</label>
+                        <input type="number" id="sunset_hour" value="%d" min="0" max="23">
+                    </div>
                 </div>
             </div>
-            <div class="col">
-                <div class="form-group">
-                    <label>Sunset Hour (is_day: false from)</label>
-                    <input type="number" id="sunset_hour" value="%d" min="0" max="23">
-                </div>
-            </div>
+            <button onclick="saveDayNight()">Сохранить</button>
+            <div id="daynight_result" class="result"></div>
         </div>
-        <button onclick="saveDayNight()">Save Day/Night</button>
-        <div id="daynight_result" class="result"></div>
     </div>
-</div>
-<script>
-// ─── constants ────────────────────────────────────────────────────────────────
-const IMG_BASE    = ["car","ecar","moto","2car"];
-const IMG_PATTERN2 = ["car","ecar","moto","2car","arrow_up","arrow_down","arrow_left","arrow_right"];
+    <script>
+        let tablesCount = %d;
+        let lastMPGSData = null;
+        const imgOptions = ["-", "car", "ecar", "moto", "2car", "arrow_up", "arrow_down", "arrow_left", "arrow_right"];
 
-// maxRows[pattern] and which img list to use
-const PATTERN_MAX_ROWS = {0: 4, 1: 3, 2: 1};
-const PATTERN_IMG = {0: IMG_BASE, 1: IMG_BASE, 2: IMG_PATTERN2};
+        function buildImgSelectHTML(id, selected) {
+            var html = '<select id="' + id + '">';
+            imgOptions.forEach(function(img) {
+                html += '<option value="' + img + '"' + (img === selected ? ' selected' : '') + '>' + img + '</option>';
+            });
+            html += '</select>';
+            return html;
+        }
 
-let tablesCount = %d;
-let lastMPGSData = null;
+        function formatMPGSResult(result) {
+            var html = '';
+            if (result.success) {
+                lastMPGSData = result;
+                html += '<div class="stats-grid">';
+                html += '<div class="stat-card"><div class="value">' + result.total_spaces + '</div><div class="label">Всего</div></div>';
+                html += '<div class="stat-card"><div class="value" style="color:green">' + result.total_free + '</div><div class="label">Свободно</div></div>';
+                html += '<div class="stat-card"><div class="value" style="color:red">' + result.total_occupied + '</div><div class="label">Занято</div></div>';
+                html += '<div class="stat-card"><div class="value">' + result.elapsed_ms + 'мс</div><div class="label">Время ответа</div></div>';
+                html += '</div>';
 
-// ─── helpers ──────────────────────────────────────────────────────────────────
-function buildImgSelectHTML(id, selected, pattern) {
-    const opts = PATTERN_IMG[pattern] || IMG_BASE;
-    let html = '<select id="' + id + '">';
-    opts.forEach(function(img) {
-        html += '<option value="' + img + '"' + (img === selected ? ' selected' : '') + '>' + img + '</option>';
-    });
-    html += '</select>';
-    return html;
-}
+                if (result.zones && Object.keys(result.zones).length > 0) {
+                    html += '<h3>По зонам</h3><table><tr><th>Зона</th><th>Всего</th><th>Свободно</th><th>Занято</th></tr>';
+                    for (var zone in result.zones) {
+                        var z = result.zones[zone];
+                        html += '<tr><td>' + zone + '</td><td>' + z.total + '</td><td style="color:green">' + z.free + '</td><td style="color:red">' + z.occupied + '</td></tr>';
+                    }
+                    html += '</table>';
+                }
 
-// ─── pattern change ──────────────────────────────────────────────────────────
-function onPatternChange(tableIdx) {
-    const patternVal = parseInt(document.getElementById('table_' + tableIdx + '_pattern').value);
-    const maxRows = PATTERN_MAX_ROWS[patternVal] || 4;
+                if (result.floors && Object.keys(result.floors).length > 0) {
+                    html += '<h3>По этажам</h3><table><tr><th>Этаж</th><th>Всего</th><th>Свободно</th><th>Занято</th></tr>';
+                    for (var floor in result.floors) {
+                        var f = result.floors[floor];
+                        html += '<tr><td>' + floor + '</td><td>' + f.total + '</td><td style="color:green">' + f.free + '</td><td style="color:red">' + f.occupied + '</td></tr>';
+                    }
+                    html += '</table>';
+                }
 
-    for (let j = 1; j <= 4; j++) {
-        const container = document.getElementById('table_' + tableIdx + '_row' + j + '_container');
-        if (!container) continue;
+                html += '<h3>Детальные данные</h3><pre>' + JSON.stringify(result.spaces, null, 2) + '</pre>';
 
-        if (j > maxRows) {
-            // Hide and clear rows that exceed the pattern limit
-            container.classList.add('hidden');
-            clearRow(tableIdx, j);
-        } else {
-            container.classList.remove('hidden');
-            // Rebuild img select with correct options for new pattern
-            const imgSel = document.getElementById('table_' + tableIdx + '_row' + j + '_img');
-            if (imgSel) {
-                const currentVal = imgSel.value;
-                const newOpts = PATTERN_IMG[patternVal] || IMG_BASE;
-                let newHTML = '';
-                newOpts.forEach(function(img) {
-                    const sel = (img === currentVal && newOpts.includes(currentVal)) ? ' selected' : '';
-                    newHTML += '<option value="' + img + '"' + sel + '>' + img + '</option>';
-                });
-                imgSel.innerHTML = newHTML;
+                updateAllCheckboxes(result);
+            } else {
+                html += '<pre style="color:red">Ошибка (' + result.elapsed_ms + 'мс): ' + result.error + '</pre>';
+            }
+            return html;
+        }
+
+        function updateAllCheckboxes(data) {
+            for (var i = 0; i < tablesCount; i++) {
+                for (var j = 1; j <= 4; j++) {
+                    updateRowCheckboxes(i, j, data);
+                }
             }
         }
-    }
-}
 
-// ─── MPGS test ────────────────────────────────────────────────────────────────
-function testMPGS() {
-    const data = {
-        base_url: document.getElementById("mpgs_url").value,
-        key:      document.getElementById("mpgs_key").value,
-        secret:   document.getElementById("mpgs_secret").value,
-        version:  "V3.6.0",
-        timeout:  parseInt(document.getElementById("mpgs_timeout").value)
-    };
-    document.getElementById("mpgs_result").innerHTML = "<pre>Loading...</pre>";
-    fetch("/api/test-mpgs", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(data)})
-    .then(r => r.json())
-    .then(result => {
-        document.getElementById("mpgs_result").innerHTML = formatMPGSResult(result);
-    });
-}
+        function updateRowCheckboxes(tableIdx, rowIdx, data) {
+            var zoneDiv = document.getElementById('table_' + tableIdx + '_row' + rowIdx + '_zonecheckboxes');
+            var floorDiv = document.getElementById('table_' + tableIdx + '_row' + rowIdx + '_floorcheckboxes');
 
-function formatMPGSResult(result) {
-    let html = '';
-    if (result.success) {
-        lastMPGSData = result;
-        html += '<div class="stats-grid">';
-        html += '<div class="stat-card"><div class="value">' + result.total_spaces + '</div><div class="label">Total Spaces</div></div>';
-        html += '<div class="stat-card"><div class="value" style="color:green">' + result.total_free + '</div><div class="label">Free</div></div>';
-        html += '<div class="stat-card"><div class="value" style="color:red">' + result.total_occupied + '</div><div class="label">Occupied</div></div>';
-        html += '<div class="stat-card"><div class="value">' + result.elapsed_ms + 'ms</div><div class="label">Response Time</div></div>';
-        html += '</div>';
-        if (result.zones && Object.keys(result.zones).length > 0) {
-            html += '<h3>By Zone</h3><table><tr><th>Zone</th><th>Total</th><th>Free</th><th>Occupied</th></tr>';
-            for (const zone in result.zones) {
-                const z = result.zones[zone];
-                html += '<tr><td>' + zone + '</td><td>' + z.total + '</td><td style="color:green">' + z.free + '</td><td style="color:red">' + z.occupied + '</td></tr>';
+            if (!zoneDiv || !floorDiv) return;
+
+            if (!data) {
+                zoneDiv.innerHTML = 'Зоны: нет данных';
+                floorDiv.innerHTML = 'Этажи: нет данных';
+                return;
             }
-            html += '</table>';
+
+            var zones = Object.keys(data.zones || {}).sort();
+            var floors = Object.keys(data.floors || {}).sort();
+
+            zoneDiv.innerHTML = 'Зоны: ' + zones.map(function(z) {
+                return '<label><input type="checkbox" class="table_' + tableIdx + '_row' + rowIdx + '_zone" value="' + z + '" onchange="updateRowValue(' + tableIdx + ', ' + rowIdx + ')"> ' + z + '</label>';
+            }).join('');
+
+            floorDiv.innerHTML = 'Этажи: ' + floors.map(function(f) {
+                return '<label><input type="checkbox" class="table_' + tableIdx + '_row' + rowIdx + '_floor" value="' + f + '" onchange="updateRowValue(' + tableIdx + ', ' + rowIdx + ')"> ' + f + '</label>';
+            }).join('');
         }
-        if (result.floors && Object.keys(result.floors).length > 0) {
-            html += '<h3>By Floor</h3><table><tr><th>Floor</th><th>Total</th><th>Free</th><th>Occupied</th></tr>';
-            for (const floor in result.floors) {
-                const f = result.floors[floor];
-                html += '<tr><td>' + floor + '</td><td>' + f.total + '</td><td style="color:green">' + f.free + '</td><td style="color:red">' + f.occupied + '</td></tr>';
+
+        function getCheckedValues(tableIdx, rowIdx, type) {
+            var checkboxes = document.querySelectorAll('.table_' + tableIdx + '_row' + rowIdx + '_' + type + ':checked');
+            return Array.from(checkboxes).map(function(cb) { return cb.value; });
+        }
+
+        function updateRowValue(tableIdx, rowIdx) {
+            if (!lastMPGSData) {
+                return;
             }
-            html += '</table>';
-        }
-        html += '<h3>Detailed Data</h3><pre>' + JSON.stringify(result.spaces, null, 2) + '</pre>';
-        updateAllCheckboxes(result);
-    } else {
-        html += '<pre style="color:red">Error (' + result.elapsed_ms + 'ms): ' + result.error + '</pre>';
-    }
-    return html;
-}
 
-// ─── checkbox helpers ─────────────────────────────────────────────────────────
-function updateAllCheckboxes(data) {
-    for (let i = 0; i < tablesCount; i++) {
-        const patternEl = document.getElementById('table_' + i + '_pattern');
-        const maxRows = patternEl ? (PATTERN_MAX_ROWS[parseInt(patternEl.value)] || 4) : 4;
-        for (let j = 1; j <= maxRows; j++) {
-            updateRowCheckboxes(i, j, data);
-        }
-    }
-}
+            var selectedZones = getCheckedValues(tableIdx, rowIdx, 'zone');
+            var selectedFloors = getCheckedValues(tableIdx, rowIdx, 'floor');
 
-function updateRowCheckboxes(tableIdx, rowIdx, data) {
-    const zoneDiv  = document.getElementById('table_' + tableIdx + '_row' + rowIdx + '_zonecheckboxes');
-    const floorDiv = document.getElementById('table_' + tableIdx + '_row' + rowIdx + '_floorcheckboxes');
-    if (!zoneDiv || !floorDiv) return;
-    if (!data) { zoneDiv.innerHTML = 'Zones: no data'; floorDiv.innerHTML = 'Floors: no data'; return; }
-
-    const zones  = Object.keys(data.zones  || {}).sort();
-    const floors = Object.keys(data.floors || {}).sort();
-
-    zoneDiv.innerHTML = 'Zones: ' + zones.map(function(z) {
-        return '<label><input type="checkbox" class="table_' + tableIdx + '_row' + rowIdx + '_zone" value="' + z + '" onchange="updateRowValue(' + tableIdx + ',' + rowIdx + ')"> ' + z + '</label>';
-    }).join('');
-    floorDiv.innerHTML = 'Floors: ' + floors.map(function(f) {
-        return '<label><input type="checkbox" class="table_' + tableIdx + '_row' + rowIdx + '_floor" value="' + f + '" onchange="updateRowValue(' + tableIdx + ',' + rowIdx + ')"> ' + f + '</label>';
-    }).join('');
-}
-
-function getCheckedValues(tableIdx, rowIdx, type) {
-    return Array.from(document.querySelectorAll('.table_' + tableIdx + '_row' + rowIdx + '_' + type + ':checked'))
-                .map(cb => cb.value);
-}
-
-function updateRowValue(tableIdx, rowIdx) {
-    if (!lastMPGSData) return;
-    const selectedZones  = getCheckedValues(tableIdx, rowIdx, 'zone');
-    const selectedFloors = getCheckedValues(tableIdx, rowIdx, 'floor');
-    if (selectedZones.length === 0 && selectedFloors.length === 0) {
-        document.getElementById('table_' + tableIdx + '_row' + rowIdx + '_text').value = '0';
-        return;
-    }
-    let totalFree = 0;
-    if (lastMPGSData.spaces) {
-        lastMPGSData.spaces.forEach(function(space) {
-            if (space.parkingSpaceStatus === 0) {
-                const zm = selectedZones.length  === 0 || selectedZones.includes(space.belongArea || 'unknown');
-                const fm = selectedFloors.length === 0 || selectedFloors.includes(space.mapName   || 'unknown');
-                if (zm && fm) totalFree++;
+            if (selectedZones.length === 0 && selectedFloors.length === 0) {
+                document.getElementById('table_' + tableIdx + '_row' + rowIdx + '_text').value = '0';
+                return;
             }
-        });
-    }
-    document.getElementById('table_' + tableIdx + '_row' + rowIdx + '_text').value = totalFree;
-    const zd = document.getElementById('table_' + tableIdx + '_row' + rowIdx + '_zones_display');
-    const fd = document.getElementById('table_' + tableIdx + '_row' + rowIdx + '_floors_display');
-    if (zd) zd.textContent = selectedZones.join(', ')  || 'any';
-    if (fd) fd.textContent = selectedFloors.join(', ') || 'any';
-}
 
-function clearRow(tableIdx, rowIdx) {
-    const textEl = document.getElementById('table_' + tableIdx + '_row' + rowIdx + '_text');
-    if (textEl) textEl.value = '';
-    document.querySelectorAll(
-        '.table_' + tableIdx + '_row' + rowIdx + '_zone:checked, ' +
-        '.table_' + tableIdx + '_row' + rowIdx + '_floor:checked'
-    ).forEach(cb => { cb.checked = false; });
-    const zd = document.getElementById('table_' + tableIdx + '_row' + rowIdx + '_zones_display');
-    const fd = document.getElementById('table_' + tableIdx + '_row' + rowIdx + '_floors_display');
-    if (zd) zd.textContent = '-';
-    if (fd) fd.textContent = '-';
-}
-
-// ─── row block HTML builder ───────────────────────────────────────────────────
-function buildRowHTML(i, j, pattern, textVal, imgVal) {
-    const imgOptions = PATTERN_IMG[pattern] || IMG_BASE;
-    let imgSel = '<select id="table_' + i + '_row' + j + '_img">';
-    imgOptions.forEach(function(img) {
-        imgSel += '<option value="' + img + '"' + (img === imgVal ? ' selected' : '') + '>' + img + '</option>';
-    });
-    imgSel += '</select>';
-
-    const maxRows = PATTERN_MAX_ROWS[pattern] || 4;
-    const hiddenClass = j > maxRows ? ' hidden' : '';
-
-    return '<div class="row-data' + hiddenClass + '" id="table_' + i + '_row' + j + '_container">' +
-        '<strong>Row ' + j + ':</strong> ' +
-        '<button class="remove-btn danger" onclick="clearRow(' + i + ',' + j + ')" style="padding:2px 8px;font-size:12px">X</button> ' +
-        'Text: <input id="table_' + i + '_row' + j + '_text" value="' + (textVal||'') + '" style="width:80px" placeholder="0" type="number"> ' +
-        'Img: ' + imgSel +
-        '<div style="margin-top:5px">' +
-        '<strong>Zones:</strong> <span id="table_' + i + '_row' + j + '_zones_display">-</span>&nbsp;' +
-        '<strong>Floors:</strong> <span id="table_' + i + '_row' + j + '_floors_display">-</span></div>' +
-        '<div class="checkbox-group">' +
-        '<div id="table_' + i + '_row' + j + '_zonecheckboxes">Zones: no data</div> ' +
-        '<div id="table_' + i + '_row' + j + '_floorcheckboxes">Floors: no data</div></div>' +
-        '<button onclick="updateRowValue(' + i + ',' + j + ')" style="background:#ff9800;padding:5px 10px;font-size:12px">Update from MPGS</button>' +
-        '</div>';
-}
-
-// ─── table HTML builder ───────────────────────────────────────────────────────
-function buildTableHTML(i, ip, port, pattern) {
-    let rowsHTML = '';
-    for (let j = 1; j <= 4; j++) {
-        rowsHTML += buildRowHTML(i, j, pattern, '', IMG_BASE[j-1] || 'car');
-    }
-    return '<button class="remove-btn danger" onclick="removeTable(' + i + ')">X</button>' +
-        '<h3>Table ' + i + '</h3>' +
-        '<div class="row">' +
-        '<div class="col"><label>IP</label><input id="table_' + i + '_ip" value="' + (ip||'192.168.50.241') + '"></div>' +
-        '<div class="col"><label>Port</label><input type="number" id="table_' + i + '_port" value="' + (port||8090) + '"></div>' +
-        '</div>' +
-        '<div class="form-group"><label>Pattern' +
-        ' <span class="pattern-badge" id="table_' + i + '_pattern_hint">0 — up to 4 rows: car/ecar/moto/2car</span></label>' +
-        '<select id="table_' + i + '_pattern" onchange="onPatternChange(' + i + ')">' +
-        '<option value="0"' + (pattern===0?' selected':'') + '>0 — 4 rows (car/ecar/moto/2car)</option>' +
-        '<option value="1"' + (pattern===1?' selected':'') + '>1 — 3 rows (car/ecar/moto/2car)</option>' +
-        '<option value="2"' + (pattern===2?' selected':'') + '>2 — 1 row  (+arrow_up/down/left/right)</option>' +
-        '</select></div>' +
-        '<div class="form-group"><label>is_day</label>' +
-        '<select id="table_' + i + '_isday"><option value="true">true (day)</option><option value="false">false (night)</option></select></div>' +
-        '<div id="table_' + i + '_rows">' + rowsHTML + '</div>' +
-        '<button onclick="testTable(' + i + ')">Test Send</button>' +
-        '<div id="table_' + i + '_result" class="result"></div>';
-}
-
-// ─── add / remove table ───────────────────────────────────────────────────────
-function addTable() {
-    const container = document.getElementById("tables_container");
-    const i = tablesCount++;
-    const div = document.createElement("div");
-    div.className = "table-block";
-    div.id = "table_" + i;
-    div.innerHTML = buildTableHTML(i, '', 8090, 0);
-    container.appendChild(div);
-    if (lastMPGSData) {
-        for (let j = 1; j <= 4; j++) updateRowCheckboxes(i, j, lastMPGSData);
-    }
-}
-
-function removeTable(i) {
-    const elem = document.getElementById("table_" + i);
-    if (elem) elem.remove();
-}
-
-// ─── test table send ──────────────────────────────────────────────────────────
-function testTable(i) {
-    const patternEl = document.getElementById("table_" + i + "_pattern");
-    const pattern   = patternEl ? parseInt(patternEl.value) : 0;
-    const maxRows   = PATTERN_MAX_ROWS[pattern] || 4;
-
-    if (lastMPGSData && lastMPGSData.spaces) {
-        for (let j = 1; j <= maxRows; j++) {
-            const textElem = document.getElementById("table_" + i + "_row" + j + "_text");
-            if (!textElem) continue;
-            const sz = getCheckedValues(i, j, 'zone');
-            const sf = getCheckedValues(i, j, 'floor');
-            if (sz.length > 0 || sf.length > 0) {
-                let free = 0;
+            var totalFree = 0;
+            if (lastMPGSData.spaces) {
                 lastMPGSData.spaces.forEach(function(space) {
                     if (space.parkingSpaceStatus === 0) {
-                        const zm = sz.length === 0 || sz.includes(space.belongArea || 'unknown');
-                        const fm = sf.length === 0 || sf.includes(space.mapName    || 'unknown');
-                        if (zm && fm) free++;
+                        var zoneMatch = selectedZones.length === 0 || selectedZones.includes(space.belongArea || 'unknown');
+                        var floorMatch = selectedFloors.length === 0 || selectedFloors.includes(space.mapName || 'unknown');
+                        if (zoneMatch && floorMatch) {
+                            totalFree++;
+                        }
                     }
                 });
-                textElem.value = free;
+            }
+
+            document.getElementById('table_' + tableIdx + '_row' + rowIdx + '_text').value = totalFree;
+
+            var zonesDisplay = document.getElementById('table_' + tableIdx + '_row' + rowIdx + '_zones_display');
+            var floorsDisplay = document.getElementById('table_' + tableIdx + '_row' + rowIdx + '_floors_display');
+            if (zonesDisplay) zonesDisplay.textContent = selectedZones.join(', ') || 'любые';
+            if (floorsDisplay) floorsDisplay.textContent = selectedFloors.join(', ') || 'любые';
+        }
+
+        function clearRow(tableIdx, rowIdx) {
+            document.getElementById('table_' + tableIdx + '_row' + rowIdx + '_text').value = '';
+            var checkboxes = document.querySelectorAll('.table_' + tableIdx + '_row' + rowIdx + '_zone:checked, .table_' + tableIdx + '_row' + rowIdx + '_floor:checked');
+            checkboxes.forEach(function(cb) { cb.checked = false; });
+            document.getElementById('table_' + tableIdx + '_row' + rowIdx + '_zones_display').textContent = '-';
+            document.getElementById('table_' + tableIdx + '_row' + rowIdx + '_floors_display').textContent = '-';
+        }
+
+        function testMPGS() {
+            var data = {
+                base_url: document.getElementById("mpgs_url").value,
+                key: document.getElementById("mpgs_key").value,
+                secret: document.getElementById("mpgs_secret").value,
+                version: "V3.6.0",
+                timeout: parseInt(document.getElementById("mpgs_timeout").value)
+            };
+            document.getElementById("mpgs_result").innerHTML = "<pre>Загрузка...</pre>";
+            fetch("/api/test-mpgs", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(data) })
+            .then(function(r) { return r.json(); })
+            .then(function(result) {
+                document.getElementById("mpgs_result").innerHTML = formatMPGSResult(result);
+            });
+        }
+
+        function testTable(i) {
+            if (lastMPGSData && lastMPGSData.spaces) {
+                for (var j = 1; j <= 4; j++) {
+                    var textElem = document.getElementById("table_" + i + "_row" + j + "_text");
+                    if (!textElem) continue;
+
+                    var selectedZones = getCheckedValues(i, j, 'zone');
+                    var selectedFloors = getCheckedValues(i, j, 'floor');
+
+                    if (selectedZones.length > 0 || selectedFloors.length > 0) {
+                        var totalFree = 0;
+                        lastMPGSData.spaces.forEach(function(space) {
+                            if (space.parkingSpaceStatus === 0) {
+                                var zoneMatch = selectedZones.length === 0 || selectedZones.includes(space.belongArea || 'unknown');
+                                var floorMatch = selectedFloors.length === 0 || selectedFloors.includes(space.mapName || 'unknown');
+                                if (zoneMatch && floorMatch) totalFree++;
+                            }
+                        });
+                        textElem.value = totalFree;
+                    }
+                }
+            }
+
+            var data = {
+                ip: document.getElementById("table_" + i + "_ip").value,
+                port: parseInt(document.getElementById("table_" + i + "_port").value),
+                pattern: 0,
+                is_day: document.getElementById("table_" + i + "_isday").value === "true"
+            };
+
+            var hasAnyRow = false;
+            for (var j = 1; j <= 4; j++) {
+                var textElem = document.getElementById("table_" + i + "_row" + j + "_text");
+                var imgElem = document.getElementById("table_" + i + "_row" + j + "_img");
+                var textVal = textElem ? textElem.value.trim() : "";
+                var imgVal = imgElem ? imgElem.value : "";
+
+                var selectedZones = getCheckedValues(i, j, 'zone');
+                var selectedFloors = getCheckedValues(i, j, 'floor');
+                var hasSelection = selectedZones.length > 0 || selectedFloors.length > 0;
+
+                if (hasSelection && textVal !== "") {
+                    var rowData = { text: textVal };
+                    if (imgVal !== "" && imgVal !== "-") {
+                        rowData.img = imgVal;
+                    }
+                    data["row" + j] = rowData;
+                    hasAnyRow = true;
+                }
+            }
+
+            if (!hasAnyRow) {
+                document.getElementById("table_" + i + "_result").innerHTML = "<pre style='color:orange'>Нет строк для отправки (не выбраны чекбоксы)</pre>";
+                return;
+            }
+
+            document.getElementById("table_" + i + "_result").innerHTML = "<pre>Отправка...</pre>";
+            fetch("/api/test-table", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(data) })
+            .then(function(r) { return r.json(); })
+            .then(function(result) {
+                var html = "";
+                if (result.success) {
+                    html += "<div class='stat-card'><div class='value' style='color:green'>OK</div><div class='label'>" + result.elapsed_ms + "мс</div></div>";
+                    html += "<pre>Ответ: " + result.response + "</pre>";
+                } else {
+                    html += "<div class='stat-card'><div class='value' style='color:red'>ОШИБКА</div><div class='label'>" + result.elapsed_ms + "мс</div></div>";
+                    html += "<pre>Ошибка: " + (result.error || "статус " + result.status) + "</pre>";
+                }
+                html += "<pre>Отправлено:\n" + JSON.stringify(JSON.parse(result.payload), null, 2) + "</pre>";
+                document.getElementById("table_" + i + "_result").innerHTML = html;
+            });
+        }
+
+        function addTable() {
+            var container = document.getElementById("tables_container");
+            var i = tablesCount++;
+            var div = document.createElement("div");
+            div.className = "table-block";
+            div.id = "table_" + i;
+
+            var rowsHTML = '';
+            for (var j = 1; j <= 4; j++) {
+                rowsHTML += '<div class="row-data" id="table_' + i + '_row' + j + '_container">' +
+                    '<strong>Строка ' + j + ':</strong> ' +
+                    '<button class="remove-btn danger" onclick="clearRow(' + i + ', ' + j + ')" style="padding:2px 8px;font-size:12px">X</button> ' +
+                    'Текст: <input id="table_' + i + '_row' + j + '_text" value="" style="width:80px" placeholder="0" type="number"> ' +
+                    'Изобр: ' + buildImgSelectHTML('table_' + i + '_row' + j + '_img', '-') +
+                    '<div style="margin-top:5px">' +
+                    '<strong>Зоны:</strong> <span id="table_' + i + '_row' + j + '_zones_display">-</span> ' +
+                    '<strong>Этажи:</strong> <span id="table_' + i + '_row' + j + '_floors_display">-</span></div>' +
+                    '<div class="checkbox-group">' +
+                    '<div id="table_' + i + '_row' + j + '_zonecheckboxes">Зоны: нет данных</div> ' +
+                    '<div id="table_' + i + '_row' + j + '_floorcheckboxes">Этажи: нет данных</div></div>' +
+                    '<button onclick="updateRowValue(' + i + ', ' + j + ')" style="background:#ff9800;padding:5px 10px;font-size:12px">Обновить из MPGS</button>' +
+                    '</div>';
+            }
+
+            div.innerHTML = '<button class="remove-btn danger" onclick="removeTable(' + i + ')">X</button>' +
+                '<h3>Табло ' + i + '</h3>' +
+                '<div class="row"><div class="col"><label>IP</label><input id="table_' + i + '_ip" value="192.168.50.241"></div>' +
+                '<div class="col"><label>Порт</label><input type="number" id="table_' + i + '_port" value="8090"></div></div>' +
+                '<div class="form-group"><label>is_day</label><select id="table_' + i + '_isday"><option value="true">true (день)</option><option value="false">false (ночь)</option></select></div>' +
+                '<div id="table_' + i + '_rows">' + rowsHTML + '</div>' +
+                '<button onclick="testTable(' + i + ')">Тест отправки</button>' +
+                '<div id="table_' + i + '_result" class="result"></div>';
+            container.appendChild(div);
+
+            if (lastMPGSData) {
+                for (var j = 1; j <= 4; j++) {
+                    updateRowCheckboxes(i, j, lastMPGSData);
+                }
             }
         }
-    }
 
-    const data = {
-        ip:      document.getElementById("table_" + i + "_ip").value,
-        port:    parseInt(document.getElementById("table_" + i + "_port").value),
-        pattern: pattern,
-        is_day:  document.getElementById("table_" + i + "_isday").value === "true"
-    };
-
-    let hasAnyRow = false;
-    for (let j = 1; j <= maxRows; j++) {
-        const textElem = document.getElementById("table_" + i + "_row" + j + "_text");
-        const imgElem  = document.getElementById("table_" + i + "_row" + j + "_img");
-        const textVal  = textElem ? textElem.value.trim() : "";
-        const imgVal   = imgElem  ? imgElem.value : "";
-        const sz = getCheckedValues(i, j, 'zone');
-        const sf = getCheckedValues(i, j, 'floor');
-        if ((sz.length > 0 || sf.length > 0) && textVal !== "") {
-            data["row" + j] = {text: textVal, img: imgVal};
-            hasAnyRow = true;
+        function removeTable(i) {
+            var elem = document.getElementById("table_" + i);
+            if (elem) elem.remove();
         }
-    }
 
-    if (!hasAnyRow) {
-        document.getElementById("table_" + i + "_result").innerHTML =
-            "<pre style='color:orange'>No rows to send (no checkboxes selected)</pre>";
-        return;
-    }
+        function saveConfig() {
+            var tables = [];
+            for (var i = 0; i < tablesCount; i++) {
+                var ipElem = document.getElementById("table_" + i + "_ip");
+                if (!ipElem) continue;
+                var table = {
+                    ip: ipElem.value,
+                    port: parseInt(document.getElementById("table_" + i + "_port").value),
+                    mode: "push",
+                    pattern: 0
+                };
 
-    document.getElementById("table_" + i + "_result").innerHTML = "<pre>Sending...</pre>";
-    fetch("/api/test-table", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(data)})
-    .then(r => r.json())
-    .then(function(result) {
-        let html = "";
-        if (result.success) {
-            html += "<div class='stat-card'><div class='value' style='color:green'>OK</div><div class='label'>" + result.elapsed_ms + "ms</div></div>";
-            html += "<pre>Response: " + result.response + "</pre>";
-        } else {
-            html += "<div class='stat-card'><div class='value' style='color:red'>FAIL</div><div class='label'>" + result.elapsed_ms + "ms</div></div>";
-            html += "<pre>Error: " + (result.error || "status " + result.status) + "</pre>";
+                for (var j = 1; j <= 4; j++) {
+                    var textElem = document.getElementById("table_" + i + "_row" + j + "_text");
+                    var imgElem = document.getElementById("table_" + i + "_row" + j + "_img");
+                    var textVal = textElem ? textElem.value.trim() : "";
+                    var imgVal = imgElem ? imgElem.value : "";
+
+                    var selectedZones = getCheckedValues(i, j, 'zone');
+                    var selectedFloors = getCheckedValues(i, j, 'floor');
+                    var hasSelection = selectedZones.length > 0 || selectedFloors.length > 0;
+
+                    if (hasSelection && textVal !== "") {
+                        table["row" + j] = {
+                            text: textVal,
+                            img: imgVal === "-" ? "" : imgVal,
+                            zones: selectedZones,
+                            floors: selectedFloors
+                        };
+                    }
+                }
+                tables.push(table);
+            }
+            var config = {
+                mpgs: {
+                    base_url: document.getElementById("mpgs_url").value,
+                    key: document.getElementById("mpgs_key").value,
+                    secret: document.getElementById("mpgs_secret").value,
+                    version: "V3.6.0",
+                    timeout_sec: parseInt(document.getElementById("mpgs_timeout").value)
+                },
+                navigation: { url: "http://navi.internal/update", timeout_sec: 2 },
+                location: { lat: 55.7558, lon: 37.6173 },
+                log_level: "debug",
+                sunrise_hour: parseInt(document.getElementById("sunrise_hour").value),
+                sunset_hour: parseInt(document.getElementById("sunset_hour").value),
+                tables: tables
+            };
+            fetch("/api/save-config", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(config) })
+            .then(function(r) { return r.json(); })
+            .then(function(result) {
+                document.getElementById("save_result").innerHTML = "<pre>" + JSON.stringify(result, null, 2) + "</pre>";
+            });
         }
-        html += "<pre>Payload sent:\n" + JSON.stringify(JSON.parse(result.payload), null, 2) + "</pre>";
-        document.getElementById("table_" + i + "_result").innerHTML = html;
-    });
-}
 
-// ─── save config ──────────────────────────────────────────────────────────────
-function collectConfig() {
-    const tables = [];
-    for (let i = 0; i < tablesCount; i++) {
-        const ipElem = document.getElementById("table_" + i + "_ip");
-        if (!ipElem) continue;
-        const patternEl = document.getElementById("table_" + i + "_pattern");
-        const pattern   = patternEl ? parseInt(patternEl.value) : 0;
-        const maxRows   = PATTERN_MAX_ROWS[pattern] || 4;
-        const table = {
-            ip: ipElem.value,
-            port: parseInt(document.getElementById("table_" + i + "_port").value),
-            mode: "push",
-            pattern: pattern
-        };
-        for (let j = 1; j <= maxRows; j++) {
-            const textElem = document.getElementById("table_" + i + "_row" + j + "_text");
-            const imgElem  = document.getElementById("table_" + i + "_row" + j + "_img");
-            const textVal  = textElem ? textElem.value.trim() : "";
-            const imgVal   = imgElem  ? imgElem.value : "";
-            const sz = getCheckedValues(i, j, 'zone');
-            const sf = getCheckedValues(i, j, 'floor');
-            if ((sz.length > 0 || sf.length > 0) && textVal !== "") {
-                table["row" + j] = {text: textVal, img: imgVal, zones: sz, floors: sf};
+        function loadSavedCheckboxes() {
+            if (!lastMPGSData) {
+                setTimeout(loadSavedCheckboxes, 1000);
+                return;
+            }
+
+            var savedTables = %s;
+            if (!savedTables || savedTables.length === 0) return;
+
+            for (var i = 0; i < savedTables.length; i++) {
+                var table = savedTables[i];
+                for (var j = 1; j <= 4; j++) {
+                    var row = table['row' + j];
+                    if (!row) continue;
+
+                    var textElem = document.getElementById('table_' + i + '_row' + j + '_text');
+                    if (textElem && row.text) {
+                        textElem.value = row.text;
+                    }
+
+                    var imgElem = document.getElementById('table_' + i + '_row' + j + '_img');
+                    if (imgElem) {
+                        imgElem.value = row.img || "-";
+                    }
+
+                    if (row.zones && row.zones.length > 0) {
+                        row.zones.forEach(function(z) {
+                            var cb = document.querySelector('.table_' + i + '_row' + j + '_zone[value="' + z + '"]');
+                            if (cb) cb.checked = true;
+                        });
+                    }
+
+                    if (row.floors && row.floors.length > 0) {
+                        row.floors.forEach(function(f) {
+                            var cb = document.querySelector('.table_' + i + '_row' + j + '_floor[value="' + f + '"]');
+                            if (cb) cb.checked = true;
+                        });
+                    }
+
+                    updateRowValue(i, j);
+                }
             }
         }
-        tables.push(table);
-    }
-    return {
-        mpgs: {
-            base_url:    document.getElementById("mpgs_url").value,
-            key:         document.getElementById("mpgs_key").value,
-            secret:      document.getElementById("mpgs_secret").value,
-            version:     "V3.6.0",
-            timeout_sec: parseInt(document.getElementById("mpgs_timeout").value)
-        },
-        navigation:   {url: "http://navi.internal/update", timeout_sec: 2},
-        location:     {lat: 55.7558, lon: 37.6173},
-        log_level:    "debug",
-        sunrise_hour: parseInt(document.getElementById("sunrise_hour").value),
-        sunset_hour:  parseInt(document.getElementById("sunset_hour").value),
-        tables:       tables
-    };
-}
 
-function saveConfig() {
-    fetch("/api/save-config", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(collectConfig())})
-    .then(r => r.json())
-    .then(result => {
-        document.getElementById("save_result").innerHTML = "<pre>" + JSON.stringify(result, null, 2) + "</pre>";
-    });
-}
-
-function saveDayNight() {
-    fetch("/api/save-config", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(collectConfig())})
-    .then(r => r.json())
-    .then(result => {
-        document.getElementById("daynight_result").innerHTML = "<pre>" + JSON.stringify(result, null, 2) + "</pre>";
-    });
-}
-
-// ─── restore saved checkboxes after MPGS load ────────────────────────────────
-function loadSavedCheckboxes() {
-    if (!lastMPGSData) { setTimeout(loadSavedCheckboxes, 1000); return; }
-    const savedTables = %s;
-    if (!savedTables || savedTables.length === 0) return;
-    for (let i = 0; i < savedTables.length; i++) {
-        const table   = savedTables[i];
-        const pattern = table.pattern || 0;
-        const maxRows = PATTERN_MAX_ROWS[pattern] || 4;
-        for (let j = 1; j <= maxRows; j++) {
-            const row = table['row' + j];
-            if (!row) continue;
-            const textElem = document.getElementById('table_' + i + '_row' + j + '_text');
-            const imgElem  = document.getElementById('table_' + i + '_row' + j + '_img');
-            if (textElem && row.text) textElem.value = row.text;
-            if (imgElem  && row.img)  imgElem.value  = row.img;
-            if (row.zones)  row.zones.forEach(z => { const cb = document.querySelector('.table_' + i + '_row' + j + '_zone[value="'  + z + '"]'); if (cb) cb.checked = true; });
-            if (row.floors) row.floors.forEach(f => { const cb = document.querySelector('.table_' + i + '_row' + j + '_floor[value="' + f + '"]'); if (cb) cb.checked = true; });
-            updateRowValue(i, j);
+        function saveDayNight() {
+            var config = {
+                mpgs: {
+                    base_url: document.getElementById("mpgs_url").value,
+                    key: document.getElementById("mpgs_key").value,
+                    secret: document.getElementById("mpgs_secret").value,
+                    version: "V3.6.0",
+                    timeout_sec: parseInt(document.getElementById("mpgs_timeout").value)
+                },
+                navigation: { url: "http://navi.internal/update", timeout_sec: 2 },
+                location: { lat: 55.7558, lon: 37.6173 },
+                log_level: "debug",
+                sunrise_hour: parseInt(document.getElementById("sunrise_hour").value),
+                sunset_hour: parseInt(document.getElementById("sunset_hour").value),
+                tables: []
+            };
+            for (var i = 0; i < tablesCount; i++) {
+                var ipElem = document.getElementById("table_" + i + "_ip");
+                if (!ipElem) continue;
+                var table = { ip: ipElem.value, port: parseInt(document.getElementById("table_" + i + "_port").value), mode: "push", pattern: 0 };
+                for (var j = 1; j <= 4; j++) {
+                    var textElem = document.getElementById("table_" + i + "_row" + j + "_text");
+                    var imgElem = document.getElementById("table_" + i + "_row" + j + "_img");
+                    if (textElem && textElem.value.trim()) {
+                        var imgVal = imgElem ? imgElem.value : "";
+                        var row = {
+                            text: textElem.value.trim(),
+                            img: imgVal === "-" ? "" : imgVal,
+                            zones: getCheckedValues(i, j, 'zone'),
+                            floors: getCheckedValues(i, j, 'floor')
+                        };
+                        table["row" + j] = row;
+                    }
+                }
+                config.tables.push(table);
+            }
+            fetch("/api/save-config", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(config) })
+            .then(function(r) { return r.json(); })
+            .then(function(result) {
+                document.getElementById("daynight_result").innerHTML = "<pre>" + JSON.stringify(result, null, 2) + "</pre>";
+            });
         }
-    }
-}
 
-// ─── boot ─────────────────────────────────────────────────────────────────────
-testMPGS();
-setTimeout(loadSavedCheckboxes, 3000);
-</script>
+        // Автозагрузка при старте
+        testMPGS();
+        setTimeout(loadSavedCheckboxes, 3000);
+    </script>
 </body>
 </html>`,
         cfg.MPGS.BaseURL, len(cfg.Tables),
         cfg.MPGS.BaseURL, cfg.MPGS.Timeout,
         cfg.MPGS.Key, cfg.MPGS.Secret,
         tablesHTML,
-        cfg.SunriseHour, cfg.SunsetHour,
+        cfg.SunriseHour,
+        cfg.SunsetHour,
         len(cfg.Tables),
         savedTablesJSON(cfg))
-}
 
-// buildTableBlockHTML renders one saved table block (server-side, on page load).
-func buildTableBlockHTML(i int, t TableConfig) string {
-    patternOptions := ""
-    for _, p := range []int{0, 1, 2} {
-        label := map[int]string{
-            0: "0 — 4 rows (car/ecar/moto/2car)",
-            1: "1 — 3 rows (car/ecar/moto/2car)",
-            2: "2 — 1 row  (+arrow_up/down/left/right)",
-        }[p]
-        sel := ""
-        if p == t.Pattern {
-            sel = " selected"
-        }
-        patternOptions += fmt.Sprintf(`<option value="%d"%s>%s</option>`, p, sel, label)
-    }
-
-    maxRows := maxRowsForPattern(t.Pattern)
-    imgForPattern := func(pattern int) []string {
-        if pattern == 2 {
-            return []string{"car", "ecar", "moto", "2car", "arrow_up", "arrow_down", "arrow_left", "arrow_right"}
-        }
-        return []string{"car", "ecar", "moto", "2car"}
-    }
-
-    buildImgSel := func(id, selected string, pattern int) string {
-        html := fmt.Sprintf(`<select id="%s">`, id)
-        for _, img := range imgForPattern(pattern) {
-            s := ""
-            if img == selected {
-                s = " selected"
-            }
-            html += fmt.Sprintf(`<option value="%s"%s>%s</option>`, img, s, img)
-        }
-        html += `</select>`
-        return html
-    }
-
-    rows := []*RowConfig{t.Row1, t.Row2, t.Row3, t.Row4}
-    rowsHTML := ""
-    for j := 1; j <= 4; j++ {
-        hiddenClass := ""
-        if j > maxRows {
-            hiddenClass = " hidden"
-        }
-        var textVal, imgVal string
-        if j <= len(rows) && rows[j-1] != nil {
-            textVal = rows[j-1].Text
-            imgVal = rows[j-1].Img
-        }
-        imgID := fmt.Sprintf("table_%d_row%d_img", i, j)
-        rowsHTML += fmt.Sprintf(`
-<div class="row-data%s" id="table_%d_row%d_container">
-    <strong>Row %d:</strong>
-    <button class="remove-btn danger" onclick="clearRow(%d,%d)" style="padding:2px 8px;font-size:12px">X</button>
-    Text: <input id="table_%d_row%d_text" value="%s" style="width:80px" placeholder="0" type="number">
-    Img: %s
-    <div style="margin-top:5px">
-        <strong>Zones:</strong> <span id="table_%d_row%d_zones_display">-</span>&nbsp;
-        <strong>Floors:</strong> <span id="table_%d_row%d_floors_display">-</span>
-    </div>
-    <div class="checkbox-group">
-        <div id="table_%d_row%d_zonecheckboxes">Zones: no data</div>
-        <div id="table_%d_row%d_floorcheckboxes">Floors: no data</div>
-    </div>
-    <button onclick="updateRowValue(%d,%d)" style="background:#ff9800;padding:5px 10px;font-size:12px">Update from MPGS</button>
-</div>`,
-            hiddenClass,
-            i, j, j,
-            i, j,
-            i, j, textVal, buildImgSel(imgID, imgVal, t.Pattern),
-            i, j, i, j,
-            i, j, i, j,
-            i, j,
-        )
-    }
-
-    return fmt.Sprintf(`
-<div class="table-block" id="table_%d">
-    <button class="remove-btn danger" onclick="removeTable(%d)">X</button>
-    <h3>Table %d</h3>
-    <div class="row">
-        <div class="col"><label>IP</label><input id="table_%d_ip" value="%s"></div>
-        <div class="col"><label>Port</label><input id="table_%d_port" value="%d" type="number"></div>
-    </div>
-    <div class="form-group">
-        <label>Pattern</label>
-        <select id="table_%d_pattern" onchange="onPatternChange(%d)">%s</select>
-    </div>
-    <div class="form-group">
-        <label>is_day</label>
-        <select id="table_%d_isday">
-            <option value="true">true (day)</option>
-            <option value="false">false (night)</option>
-        </select>
-    </div>
-    <div id="table_%d_rows">%s</div>
-    <button onclick="testTable(%d)">Test Send</button>
-    <div id="table_%d_result" class="result"></div>
-</div>`,
-        i, i, i,
-        i, t.IP,
-        i, t.Port,
-        i, i, patternOptions,
-        i,
-        i, rowsHTML,
-        i, i,
-    )
+    return html
 }
 
 func (ws *WebServer) handleTestMPGS(w http.ResponseWriter, r *http.Request) {
-    if r.Method != "POST" { http.Error(w, "Method not allowed", 405); return }
+    if r.Method != "POST" {
+        http.Error(w, "Method not allowed", 405)
+        return
+    }
 
     var req struct {
         BaseURL string `json:"base_url"`
@@ -1860,13 +1751,17 @@ func (ws *WebServer) handleTestMPGS(w http.ResponseWriter, r *http.Request) {
         Version string `json:"version"`
         Timeout int    `json:"timeout"`
     }
+
     if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-        respondJSON(w, map[string]interface{}{"error": err.Error()}); return
+        respondJSON(w, map[string]interface{}{"error": err.Error()})
+        return
     }
+
     if req.Timeout == 0 { req.Timeout = 5 }
     if req.Version == "" { req.Version = "V3.6.0" }
 
     f := NewMPGSFetcher(req.BaseURL, req.Key, req.Secret, req.Version, req.Timeout)
+
     ctx, cancel := context.WithTimeout(r.Context(), time.Duration(req.Timeout)*time.Second)
     defer cancel()
 
@@ -1874,63 +1769,97 @@ func (ws *WebServer) handleTestMPGS(w http.ResponseWriter, r *http.Request) {
     data, err := f.Fetch(ctx)
     elapsed := time.Since(startTime)
 
-    result := map[string]interface{}{"elapsed_ms": elapsed.Milliseconds(), "success": err == nil}
+    result := map[string]interface{}{
+        "elapsed_ms": elapsed.Milliseconds(),
+        "success":    err == nil,
+    }
+
     if err != nil {
         result["error"] = err.Error()
     } else {
-        zones  := make(map[string]map[string]int)
+        zones := make(map[string]map[string]int)
         floors := make(map[string]map[string]int)
-        totalFree, totalOccupied := 0, 0
+        totalFree := 0
+        totalOccupied := 0
+
         for _, space := range data {
-            zone := space.BelongArea; if zone == "" { zone = "unknown" }
-            if _, ok := zones[zone]; !ok { zones[zone] = map[string]int{"free": 0, "occupied": 0, "total": 0} }
+            zone := space.BelongArea
+            if zone == "" { zone = "unknown" }
+            if _, ok := zones[zone]; !ok {
+                zones[zone] = map[string]int{"free": 0, "occupied": 0, "total": 0}
+            }
             zones[zone]["total"]++
-            floor := space.MapName; if floor == "" { floor = "unknown" }
-            if _, ok := floors[floor]; !ok { floors[floor] = map[string]int{"free": 0, "occupied": 0, "total": 0} }
+            if space.ParkingSpaceStatus == 0 {
+                zones[zone]["free"]++
+                totalFree++
+            } else {
+                zones[zone]["occupied"]++
+                totalOccupied++
+            }
+
+            floor := space.MapName
+            if floor == "" { floor = "unknown" }
+            if _, ok := floors[floor]; !ok {
+                floors[floor] = map[string]int{"free": 0, "occupied": 0, "total": 0}
+            }
             floors[floor]["total"]++
             if space.ParkingSpaceStatus == 0 {
-                zones[zone]["free"]++; floors[floor]["free"]++; totalFree++
+                floors[floor]["free"]++
             } else {
-                zones[zone]["occupied"]++; floors[floor]["occupied"]++; totalOccupied++
+                floors[floor]["occupied"]++
             }
         }
+
         result["total_spaces"] = len(data)
-        result["total_free"]   = totalFree
+        result["total_free"] = totalFree
         result["total_occupied"] = totalOccupied
-        result["zones"]  = zones
+        result["zones"] = zones
         result["floors"] = floors
         result["spaces"] = data
     }
+
     respondJSON(w, result)
 }
 
 func (ws *WebServer) handleTestTable(w http.ResponseWriter, r *http.Request) {
-    if r.Method != "POST" { http.Error(w, "Method not allowed", 405); return }
+    if r.Method != "POST" {
+        http.Error(w, "Method not allowed", 405)
+        return
+    }
 
     var req struct {
         IP      string `json:"ip"`
         Port    int    `json:"port"`
         Pattern int    `json:"pattern"`
         IsDay   bool   `json:"is_day"`
-        Row1    *struct{ Text string `json:"text"`; Img string `json:"img"` } `json:"row1"`
-        Row2    *struct{ Text string `json:"text"`; Img string `json:"img"` } `json:"row2"`
-        Row3    *struct{ Text string `json:"text"`; Img string `json:"img"` } `json:"row3"`
-        Row4    *struct{ Text string `json:"text"`; Img string `json:"img"` } `json:"row4"`
-    }
-    if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-        respondJSON(w, map[string]interface{}{"error": err.Error()}); return
+        Row1    *struct {
+            Text string `json:"text"`
+            Img  string `json:"img,omitempty"`
+        } `json:"row1"`
+        Row2 *struct {
+            Text string `json:"text"`
+            Img  string `json:"img,omitempty"`
+        } `json:"row2"`
+        Row3 *struct {
+            Text string `json:"text"`
+            Img  string `json:"img,omitempty"`
+        } `json:"row3"`
+        Row4 *struct {
+            Text string `json:"text"`
+            Img  string `json:"img,omitempty"`
+        } `json:"row4"`
     }
 
-    // Enforce pattern constraints server-side
-    maxRows := maxRowsForPattern(req.Pattern)
-    if maxRows < 4 { req.Row4 = nil }
-    if maxRows < 3 { req.Row3 = nil }
-    if maxRows < 2 { req.Row2 = nil }
+    if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+        respondJSON(w, map[string]interface{}{"error": err.Error()})
+        return
+    }
 
     payload := map[string]interface{}{
-        "type": "strs", "version": 1,
+        "type":     "strs",
+        "version":  1,
         "datetime": time.Now().Unix(),
-        "pattern":  req.Pattern,
+        "pattern":  0,
         "is_day":   req.IsDay,
     }
     if req.Row1 != nil { payload["str1"] = req.Row1 }
@@ -1940,19 +1869,24 @@ func (ws *WebServer) handleTestTable(w http.ResponseWriter, r *http.Request) {
 
     payloadJSON, _ := json.Marshal(payload)
     url := fmt.Sprintf("http://%s:%d/places", req.IP, req.Port)
+
     client := &http.Client{Timeout: 5 * time.Second}
     startTime := time.Now()
+
     httpReq, _ := http.NewRequest("POST", url, strings.NewReader(string(payloadJSON)))
     httpReq.Header.Set("Content-Type", "application/json")
     httpReq.Header.Set("Connection", "close")
 
     resp, err := client.Do(httpReq)
     elapsed := time.Since(startTime)
+
     result := map[string]interface{}{
-        "url": url, "payload": string(payloadJSON),
+        "url":        url,
+        "payload":    string(payloadJSON),
         "elapsed_ms": elapsed.Milliseconds(),
         "success":    err == nil && resp != nil && resp.StatusCode == 200,
     }
+
     if err != nil {
         result["error"] = err.Error()
     } else {
@@ -1961,70 +1895,104 @@ func (ws *WebServer) handleTestTable(w http.ResponseWriter, r *http.Request) {
         resp.Body.Close()
         result["response"] = string(body)
     }
+
     respondJSON(w, result)
 }
 
 func (ws *WebServer) handleSaveConfig(w http.ResponseWriter, r *http.Request) {
-    if r.Method != "POST" { http.Error(w, "Method not allowed", 405); return }
+    if r.Method != "POST" {
+        http.Error(w, "Method not allowed", 405)
+        return
+    }
 
     var newCfg Config
     if err := json.NewDecoder(r.Body).Decode(&newCfg); err != nil {
-        respondJSON(w, map[string]interface{}{"error": "Invalid JSON: " + err.Error()}); return
-    }
-
-    // Strip rows that exceed the pattern limit before validating / saving
-    for idx := range newCfg.Tables {
-        t := &newCfg.Tables[idx]
-        maxRows := maxRowsForPattern(t.Pattern)
-        if maxRows < 4 { t.Row4 = nil }
-        if maxRows < 3 { t.Row3 = nil }
-        if maxRows < 2 { t.Row2 = nil }
+        respondJSON(w, map[string]interface{}{"error": "Invalid JSON: " + err.Error()})
+        return
     }
 
     if err := newCfg.Validate(); err != nil {
-        respondJSON(w, map[string]interface{}{"error": "Validation: " + err.Error()}); return
+        respondJSON(w, map[string]interface{}{"error": "Validation: " + err.Error()})
+        return
     }
 
     data, err := json.MarshalIndent(newCfg, "", "  ")
-    if err != nil { respondJSON(w, map[string]interface{}{"error": "Marshal: " + err.Error()}); return }
+    if err != nil {
+        respondJSON(w, map[string]interface{}{"error": "Marshal: " + err.Error()})
+        return
+    }
+
     if err := os.WriteFile(ws.cfgPath, data, 0644); err != nil {
-        respondJSON(w, map[string]interface{}{"error": "Write: " + err.Error()}); return
+        respondJSON(w, map[string]interface{}{"error": "Write: " + err.Error()})
+        return
     }
 
     go func() {
         time.Sleep(1 * time.Second)
         cfg := Get()
-        if cfg == nil { return }
+        if cfg == nil {
+            log.Error().Msg("Config not loaded after save")
+            return
+        }
+
         f := NewMPGSFetcher(cfg.MPGS.BaseURL, cfg.MPGS.Key, cfg.MPGS.Secret, cfg.MPGS.Version, cfg.MPGS.Timeout)
         ctx, cancel := context.WithTimeout(context.Background(), time.Duration(cfg.MPGS.Timeout)*time.Second)
         defer cancel()
+
         spaces, err := f.Fetch(ctx)
-        if err != nil { log.Error().Err(err).Msg("MPGS fetch after config save failed"); return }
-        zoneFree  := make(map[string]int)
+        if err != nil {
+            log.Error().Err(err).Msg("MPGS fetch after config save failed")
+            return
+        }
+
+        log.Info().Int("spaces", len(spaces)).Msg("MPGS fetched after config save, sending to tables...")
+
+        zoneFree := make(map[string]int)
         floorFree := make(map[string]int)
         for _, s := range spaces {
             if s.ParkingSpaceStatus == 0 {
-                z := s.BelongArea; if z == "" { z = "unknown" }; zoneFree[z]++
-                fl := s.MapName;   if fl == "" { fl = "unknown" }; floorFree[fl]++
+                zone := s.BelongArea
+                if zone == "" { zone = "unknown" }
+                zoneFree[zone]++
+                floor := s.MapName
+                if floor == "" { floor = "unknown" }
+                floorFree[floor]++
             }
         }
+
         for _, table := range cfg.Tables {
-            if table.Mode != "push" { continue }
-            maxRows := maxRowsForPattern(table.Pattern)
+            if table.Mode != "push" {
+                continue
+            }
             payload := map[string]interface{}{
-                "type": "strs", "version": 1,
-                "datetime": time.Now().Unix(),
-                "pattern":  table.Pattern,
-                "is_day":   isDaytime(),
+                "type": "strs", "version": 1, "datetime": time.Now().Unix(), "pattern": 0,
+                "is_day": isDaytime(),
             }
-            rowPtrs := []*RowConfig{table.Row1, table.Row2, table.Row3, table.Row4}
-            strKeys := []string{"str1", "str2", "str3", "str4"}
-            for j := 0; j < maxRows; j++ {
-                rp := rowPtrs[j]
-                if rp == nil || (len(rp.Zones) == 0 && len(rp.Floors) == 0) { continue }
-                cnt := countFreeSpaces(zoneFree, floorFree, rp.Zones, rp.Floors)
-                payload[strKeys[j]] = map[string]string{"text": fmt.Sprintf("%d", cnt), "img": rp.Img}
+            if table.Row1 != nil && (len(table.Row1.Zones) > 0 || len(table.Row1.Floors) > 0) {
+                cnt := countFreeSpaces(zoneFree, floorFree, table.Row1.Zones, table.Row1.Floors)
+                row := map[string]string{"text": fmt.Sprintf("%d", cnt)}
+                if table.Row1.Img != "" { row["img"] = table.Row1.Img }
+                payload["str1"] = row
             }
+            if table.Row2 != nil && (len(table.Row2.Zones) > 0 || len(table.Row2.Floors) > 0) {
+                cnt := countFreeSpaces(zoneFree, floorFree, table.Row2.Zones, table.Row2.Floors)
+                row := map[string]string{"text": fmt.Sprintf("%d", cnt)}
+                if table.Row2.Img != "" { row["img"] = table.Row2.Img }
+                payload["str2"] = row
+            }
+            if table.Row3 != nil && (len(table.Row3.Zones) > 0 || len(table.Row3.Floors) > 0) {
+                cnt := countFreeSpaces(zoneFree, floorFree, table.Row3.Zones, table.Row3.Floors)
+                row := map[string]string{"text": fmt.Sprintf("%d", cnt)}
+                if table.Row3.Img != "" { row["img"] = table.Row3.Img }
+                payload["str3"] = row
+            }
+            if table.Row4 != nil && (len(table.Row4.Zones) > 0 || len(table.Row4.Floors) > 0) {
+                cnt := countFreeSpaces(zoneFree, floorFree, table.Row4.Zones, table.Row4.Floors)
+                row := map[string]string{"text": fmt.Sprintf("%d", cnt)}
+                if table.Row4.Img != "" { row["img"] = table.Row4.Img }
+                payload["str4"] = row
+            }
+
             payloadJSON, _ := json.Marshal(payload)
             url := fmt.Sprintf("http://%s:%d/places", table.IP, table.Port)
             client := &http.Client{Timeout: 5 * time.Second}
@@ -2035,7 +2003,8 @@ func (ws *WebServer) handleSaveConfig(w http.ResponseWriter, r *http.Request) {
             if err != nil {
                 log.Error().Err(err).Str("ip", table.IP).Msg("Send after config save failed")
             } else {
-                body, _ := io.ReadAll(resp.Body); resp.Body.Close()
+                body, _ := io.ReadAll(resp.Body)
+                resp.Body.Close()
                 log.Info().Str("ip", table.IP).Int("status", resp.StatusCode).Str("response", string(body)).Msg("Sent to table after config save")
             }
         }
@@ -2058,7 +2027,7 @@ WEBEOF
 }
 
 ###############################################################################
-# Шаг 7: Компиляция
+# Шаг 7: Сборка проекта
 ###############################################################################
 
 build_project() {
@@ -2115,7 +2084,7 @@ create_config() {
     "lat": 55.7558,
     "lon": 37.6173
   },
-  "log_level": "info",
+  "log_level": "debug",
   "sunrise_hour": 7,
   "sunset_hour": 18,
   "tables": [
@@ -2124,10 +2093,10 @@ create_config() {
       "port": ${TABLE1_PORT},
       "mode": "push",
       "pattern": 0,
-      "row1": {"text": "", "img": "car",  "zones": [], "floors": []},
-      "row2": {"text": "", "img": "ecar", "zones": [], "floors": []},
-      "row3": {"text": "", "img": "moto", "zones": [], "floors": []},
-      "row4": {"text": "", "img": "2car", "zones": [], "floors": []}
+      "row1": {"text": "", "img": "", "zones": [], "floors": []},
+      "row2": {"text": "", "img": "", "zones": [], "floors": []},
+      "row3": {"text": "", "img": "", "zones": [], "floors": []},
+      "row4": {"text": "", "img": "", "zones": [], "floors": []}
     }
   ]
 }
@@ -2279,6 +2248,7 @@ show_summary() {
     echo -e "${YELLOW}Изменение настроек:${NC}"
     echo "  $CONFIG_DIR/config.json (применяются автоматически)"
     echo ""
+
     echo "Последние логи:"
     journalctl -u "$SERVICE_NAME" -n 10 --no-pager
 }
@@ -2291,7 +2261,7 @@ main() {
     clear
     echo ""
     echo "============================================="
-    echo "  Parking Proxy Installation Script v4.1.0"
+    echo "  Parking Proxy Installation Script v5.0.0"
     echo "============================================="
     echo ""
 

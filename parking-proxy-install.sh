@@ -1,7 +1,7 @@
 #!/bin/bash
 ###############################################################################
 # ParkingProxy - Complete Installation Script
-# Версия: 5.1.0
+# Версия: 5.1.1
 # Описание: Автоматическое развёртывание RPS for Yandex
 ###############################################################################
 
@@ -1403,8 +1403,8 @@ func buildIndexHTML(cfg *Config) string {
             document.getElementById('table_' + tableIdx + '_row' + rowIdx + '_text').value = totalFree;
             var zonesDisplay = document.getElementById('table_' + tableIdx + '_row' + rowIdx + '_zones_display');
             var floorsDisplay = document.getElementById('table_' + tableIdx + '_row' + rowIdx + '_floors_display');
-            if (zonesDisplay) zonesDisplay.textContent = selectedZones.join(', ') || 'любые';
-            if (floorsDisplay) floorsDisplay.textContent = selectedFloors.join(', ') || 'любые';
+            if (zonesDisplay) zonesDisplay.textContent = selectedZones.join(', ') || 'нет';
+            if (floorsDisplay) floorsDisplay.textContent = selectedFloors.join(', ') || 'нет';
         }
 
         function clearRow(tableIdx, rowIdx) {

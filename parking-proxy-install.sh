@@ -1177,10 +1177,10 @@ func buildIndexHTML(cfg *Config) string {
                     <div id="table_%d_row%d_zonecheckboxes" style="display:inline">Зоны: нет данных</div>
                     <div id="table_%d_row%d_floorcheckboxes" style="display:inline;margin-left:10px">Этажи: нет данных</div>
                 </div>
-                <button onclick="updateRowValue(%d, %d)" style="background:#ff9800;padding:5px 10px;font-size:12px">Обновить из MPGS</button>
+
             </div>`, i, j, displayStyle, j, i, j, i, j, textVal,
                 buildImgSelect(fmt.Sprintf("table_%d_row%d_img", i, j), imgVal, validImgs),
-                i, j, i, j, i, j, i, j)
+                i, j, i, j, i, j)
         }
 
         tablesHTML += fmt.Sprintf(`
@@ -1470,8 +1470,7 @@ func buildIndexHTML(cfg *Config) string {
                     'Текст: <input id="table_' + i + '_row' + j + '_text" value="" style="width:80px" placeholder="0" type="number"> ' +
                     'Изобр: ' + buildImgSelectHTML('table_' + i + '_row' + j + '_img', '-', validImgs) +
                     '<div style="margin-top:5px"><strong>Зоны:</strong> <span id="table_' + i + '_row' + j + '_zones_display">-</span> <strong>Этажи:</strong> <span id="table_' + i + '_row' + j + '_floors_display">-</span></div>' +
-                    '<div class="checkbox-group"><div id="table_' + i + '_row' + j + '_zonecheckboxes">Зоны: нет данных</div> <div id="table_' + i + '_row' + j + '_floorcheckboxes">Этажи: нет данных</div></div>' +
-                    '<button onclick="updateRowValue(' + i + ', ' + j + ')" style="background:#ff9800;padding:5px 10px;font-size:12px">Обновить из MPGS</button></div>';
+                    '<div class="checkbox-group"><div id="table_' + i + '_row' + j + '_zonecheckboxes">Зоны: нет данных</div> <div id="table_' + i + '_row' + j + '_floorcheckboxes">Этажи: нет данных</div></div>' </div>';
             }
             div.innerHTML = '<button class="remove-btn danger" onclick="removeTable(' + i + ')">X</button>' +
                 '<h3><input id="table_' + i + '_name" value="Табло ' + (i+1) + '" style="font-size:16px;font-weight:bold;border:1px solid transparent;background:transparent;width:200px;padding:4px" placeholder="Название" onfocus="this.style.borderColor=\'#1a73e8\';this.style.background=\'white\'" onblur="this.style.borderColor=\'transparent\';this.style.background=\'transparent\'"></h3>' +

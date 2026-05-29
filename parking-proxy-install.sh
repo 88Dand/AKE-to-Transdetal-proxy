@@ -1914,7 +1914,7 @@ main() {
     clear
     echo ""
     echo "============================================="
-    echo "  RPS for Yandex Installation Script v5.1.0"
+    echo "  RPS for Yandex Installation Script v5.1.1"
     echo "============================================="
     echo ""
     mkdir -p "$PROJECT_DIR"

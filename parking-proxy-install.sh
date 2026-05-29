@@ -405,14 +405,16 @@ type MPGSConfig struct {
 
 
 type TableConfig struct {
-    IP      string     `json:"ip"`
-    Port    int        `json:"port"`
-    Mode    string     `json:"mode"`
-    Pattern int        `json:"pattern"`
-    Row1    *RowConfig `json:"row1,omitempty"`
-    Row2    *RowConfig `json:"row2,omitempty"`
-    Row3    *RowConfig `json:"row3,omitempty"`
-    Row4    *RowConfig `json:"row4,omitempty"`
+    IP       string     `json:"ip"`
+    Port     int        `json:"port"`
+    Mode     string     `json:"mode"`
+    Pattern  int        `json:"pattern"`
+    IsDay    *bool      `json:"is_day,omitempty"`   // null = авто, true = день, false = ночь
+    DayMode  string     `json:"day_mode"`            // "auto", "day", "night"
+    Row1     *RowConfig `json:"row1,omitempty"`
+    Row2     *RowConfig `json:"row2,omitempty"`
+    Row3     *RowConfig `json:"row3,omitempty"`
+    Row4     *RowConfig `json:"row4,omitempty"`
 }
 
 type RowConfig struct {
@@ -803,7 +805,7 @@ func (p *Processor) Process(data []SpaceInfo, cfg *Config) (map[string]TablePayl
             Type:    "strs",
             Version: 1,
             Pattern: t.Pattern,
-            IsDay:   isDaytime(),
+            IsDay:   getTableDaytime(),
         }
 
         hasAnyRow := false
@@ -865,6 +867,12 @@ func countFreeSpaces(zoneFree, floorFree map[string]int, zones, floors []string)
     for _, z := range zones { count += zoneFree[z] }
     for _, f := range floors { count += floorFree[f] }
     return count
+}
+
+func getTableDaytime(t TableConfig) bool {
+    if t.DayMode == "day" { return true }
+    if t.DayMode == "night" { return false }
+    return isDaytime() // "auto"
 }
 
 func isDaytime() bool {
@@ -1187,7 +1195,9 @@ func buildIndexHTML(cfg *Config) string {
                 <div class="col"><label>Порт</label><input id="table_%d_port" value="%d" type="number"></div>
                 <div class="col"><label>Шаблон</label><select id="table_%d_pattern" onchange="onPatternChange(%d)"><option value="0"%s>0 (4 строки)</option><option value="1"%s>1 (3 строки)</option><option value="2"%s>2 (1 строка)</option></select></div>
             </div>
-            <div class="form-group"><label>is_day</label><select id="table_%d_isday"><option value="true">true (день)</option><option value="false">false (ночь)</option></select></div>
+            <div class="row">
+                <div class="col"><label>День/ночь</label><select id="table_%d_daymode"><option value="auto"%s>Авто</option><option value="day"%s>День</option><option value="night"%s>Ночь</option></select></div>
+            </div>
             <div id="table_%d_rows">%s</div>
             <button onclick="testTable(%d)">Тест отправки</button>
             <div id="table_%d_result" class="result"></div>
@@ -1196,7 +1206,11 @@ func buildIndexHTML(cfg *Config) string {
             map[bool]string{true: " selected", false: ""}[t.Pattern == 0],
             map[bool]string{true: " selected", false: ""}[t.Pattern == 1],
             map[bool]string{true: " selected", false: ""}[t.Pattern == 2],
-            i, i, rowsHTML, i, i)
+            i,
+            map[bool]string{true: " selected", false: ""}[t.DayMode == "auto" || t.DayMode == ""],
+            map[bool]string{true: " selected", false: ""}[t.DayMode == "day"],
+            map[bool]string{true: " selected", false: ""}[t.DayMode == "night"],
+            i, rowsHTML, i, i)
     }
 
     html := fmt.Sprintf(`<!DOCTYPE html>
@@ -1448,7 +1462,8 @@ func buildIndexHTML(cfg *Config) string {
                 ip: document.getElementById("table_" + i + "_ip").value,
                 port: parseInt(document.getElementById("table_" + i + "_port").value),
                 pattern: parseInt(document.getElementById("table_" + i + "_pattern").value),
-                is_day: document.getElementById("table_" + i + "_isday").value === "true"
+                var dayMode = document.getElementById("table_" + i + "_daymode").value;
+                is_day: dayMode === "day" ? true : (dayMode === "night" ? false : true),
             };
 
             var hasAnyRow = false;
@@ -1517,11 +1532,10 @@ func buildIndexHTML(cfg *Config) string {
                 '<div class="row"><div class="col"><label>IP</label><input id="table_' + i + '_ip" value="192.168.50.241"></div>' +
                 '<div class="col"><label>Порт</label><input type="number" id="table_' + i + '_port" value="8090"></div>' +
                 '<div class="col"><label>Шаблон</label><select id="table_' + i + '_pattern" onchange="onPatternChange(' + i + ')"><option value="0">0 (4 строки)</option><option value="1">1 (3 строки)</option><option value="2">2 (1 строка)</option></select></div></div>' +
-                '<div class="form-group"><label>is_day</label><select id="table_' + i + '_isday"><option value="true">true (день)</option><option value="false">false (ночь)</option></select></div>' +
+                '<div class="row"><div class="col"><label>День/ночь</label><select id="table_' + i + '_daymode"><option value="auto">Авто</option><option value="day">День</option><option value="night">Ночь</option></select></div></div>' +
                 '<div id="table_' + i + '_rows">' + rowsHTML + '</div>' +
                 '<button onclick="testTable(' + i + ')">Тест отправки</button>' +
                 '<div id="table_' + i + '_result" class="result"></div>';
-            container.appendChild(div);
             if (lastMPGSData) { for (var j = 1; j <= 4; j++) updateRowCheckboxes(i, j, lastMPGSData); }
         }
 
@@ -1534,7 +1548,7 @@ func buildIndexHTML(cfg *Config) string {
                 if (!ipElem) continue;
                 var pattern = parseInt(document.getElementById("table_" + i + "_pattern").value);
                 var maxRows = getMaxRows(pattern);
-                var table = { ip: ipElem.value, port: parseInt(document.getElementById("table_" + i + "_port").value), mode: "push", pattern: pattern };
+                var table = { ip: ipElem.value, port: parseInt(document.getElementById("table_" + i + "_port").value), mode: "push", pattern: pattern, day_mode: document.getElementById("table_" + i + "_daymode").value, };
 
                 for (var j = 1; j <= maxRows; j++) {
                     var textElem = document.getElementById("table_" + i + "_row" + j + "_text");
@@ -1572,6 +1586,9 @@ func buildIndexHTML(cfg *Config) string {
                 if (table.pattern !== undefined) {
                     document.getElementById("table_" + i + "_pattern").value = table.pattern;
                     onPatternChange(i);
+                }
+				if (table.day_mode) {
+                    document.getElementById("table_" + i + "_daymode").value = table.day_mode;
                 }
                 var maxRows = getMaxRows(table.pattern || 0);
                 for (var j = 1; j <= maxRows; j++) {
@@ -1730,7 +1747,7 @@ func (ws *WebServer) handleSaveConfig(w http.ResponseWriter, r *http.Request) {
         for _, table := range cfg.Tables {
             if table.Mode != "push" { continue }
             maxRows := getMaxRows(table.Pattern)
-            payload := map[string]interface{}{"type": "strs", "version": 1, "datetime": time.Now().Unix(), "pattern": table.Pattern, "is_day": isDaytime()}
+            payload := map[string]interface{}{"type": "strs", "version": 1, "datetime": time.Now().Unix(), "pattern": table.Pattern, "is_day": getTableDaytime(table)}
 
             if table.Row1 != nil && maxRows >= 1 && (len(table.Row1.Zones) > 0 || len(table.Row1.Floors) > 0) {
                 cnt := countFreeSpaces(zoneFree, floorFree, table.Row1.Zones, table.Row1.Floors)
@@ -1816,6 +1833,8 @@ create_config() {
   "mpgs": { "base_url": "${MPGS_BASE_URL}", "key": "${MPGS_KEY}", "secret": "${MPGS_SECRET}", "version": "${MPGS_VERSION}", "timeout_sec": 2 },
   "location": { "lat": 55.7558, "lon": 37.6173 },
   "log_level": "debug",
+  "is_day": null,
+  "day_mode": "auto",
   "sunrise_hour": 7,
   "sunset_hour": 18,
   "tables": [{ "ip": "${TABLE1_IP}", "port": ${TABLE1_PORT}, "mode": "push", "pattern": 0,

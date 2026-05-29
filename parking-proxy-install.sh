@@ -1190,8 +1190,6 @@ func buildIndexHTML(cfg *Config) string {
                 <div class="col"><label>IP</label><input id="table_%d_ip" value="%s"></div>
                 <div class="col"><label>Порт</label><input id="table_%d_port" value="%d" type="number"></div>
                 <div class="col"><label>Шаблон</label><select id="table_%d_pattern" onchange="onPatternChange(%d)"><option value="0"%s>0 (4 строки)</option><option value="1"%s>1 (3 строки)</option><option value="2"%s>2 (1 строка)</option></select></div>
-            </div>
-            <div class="row">
                 <div class="col"><label>День/ночь</label><select id="table_%d_daymode"><option value="auto"%s>Авто</option><option value="day"%s>День</option><option value="night"%s>Ночь</option></select></div>
             </div>
             <div id="table_%d_rows">%s</div>

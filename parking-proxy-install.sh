@@ -1,7 +1,7 @@
 #!/bin/bash
 ###############################################################################
 # RPS for Yandex - Complete Installation Script
-# Версия: 5.4.0
+# Версия: 5.3.0
 # Описание: Автоматическое развёртывание RPS for Yandex
 ###############################################################################
 
@@ -1177,20 +1177,16 @@ func buildIndexHTML(cfg *Config) string {
                     <div id="table_%d_row%d_zonecheckboxes" style="display:inline">Зоны: нет данных</div>
                     <div id="table_%d_row%d_floorcheckboxes" style="display:inline;margin-left:10px">Этажи: нет данных</div>
                 </div>
+                <button onclick="updateRowValue(%d, %d)" style="background:#ff9800;padding:5px 10px;font-size:12px">Обновить из MPGS</button>
             </div>`, i, j, displayStyle, j, i, j, i, j, textVal,
                 buildImgSelect(fmt.Sprintf("table_%d_row%d_img", i, j), imgVal, validImgs),
-                i, j, i, j, i, j)
+                i, j, i, j, i, j, i, j)
         }
 
         tablesHTML += fmt.Sprintf(`
         <div class="table-block" id="table_%d">
             <button class="remove-btn danger" onclick="removeTable(%d)">X</button>
-            <h3 style="display:flex;align-items:center;gap:8px">
-                <span id="table_%d_name_display">%s</span>
-                <input id="table_%d_name" value="%s" style="display:none;font-size:16px;font-weight:bold;border:1px solid #1a73e8;background:white;padding:4px;width:200px;border-radius:4px" placeholder="Название">
-                <button onclick="editTableName(%d)" id="table_%d_editbtn" style="background:none;border:none;cursor:pointer;font-size:16px;padding:0" title="Редактировать название">✏️</button>
-                <button onclick="saveTableName(%d)" id="table_%d_savebtn" style="display:none;background:#28a745;color:white;border:none;border-radius:4px;cursor:pointer;padding:4px 10px;font-size:14px" title="Сохранить">💾</button>
-            </h3>
+            <h3><input id="table_%d_name" value="%s" style="font-size:16px;font-weight:bold;border:none;background:transparent;width:200px" placeholder="Название"></h3>
             <div class="row">
                 <div class="col"><label>IP</label><input id="table_%d_ip" value="%s"></div>
                 <div class="col"><label>Порт</label><input id="table_%d_port" value="%d" type="number"></div>
@@ -1200,10 +1196,7 @@ func buildIndexHTML(cfg *Config) string {
             <div id="table_%d_rows">%s</div>
             <button onclick="testTable(%d)">Тест отправки</button>
             <div id="table_%d_result" class="result"></div>
-        </div>`,
-            i, i,
-            i, t.Name, i, t.Name, i, i, i, i,
-            i, t.IP, i, t.Port,
+        </div>`, i, i, i, t.Name, i, t.IP, i, t.Port,
             i, i,
             map[bool]string{true: " selected", false: ""}[t.Pattern == 0],
             map[bool]string{true: " selected", false: ""}[t.Pattern == 1],
@@ -1399,24 +1392,6 @@ func buildIndexHTML(cfg *Config) string {
             checkboxes.forEach(function(cb) { cb.checked = false; });
         }
 
-        function editTableName(i) {
-            document.getElementById("table_" + i + "_name_display").style.display = "none";
-            document.getElementById("table_" + i + "_name").style.display = "";
-            document.getElementById("table_" + i + "_editbtn").style.display = "none";
-            document.getElementById("table_" + i + "_savebtn").style.display = "";
-            document.getElementById("table_" + i + "_name").focus();
-        }
-
-        function saveTableName(i) {
-            var nameInput = document.getElementById("table_" + i + "_name");
-            var name = nameInput.value.trim() || "Табло " + (i+1);
-            document.getElementById("table_" + i + "_name_display").textContent = name;
-            document.getElementById("table_" + i + "_name_display").style.display = "";
-            nameInput.style.display = "none";
-            document.getElementById("table_" + i + "_editbtn").style.display = "";
-            document.getElementById("table_" + i + "_savebtn").style.display = "none";
-        }
-
         function testMPGS() {
             var data = { base_url: document.getElementById("mpgs_url").value, key: document.getElementById("mpgs_key").value, secret: document.getElementById("mpgs_secret").value, version: "V3.6.0", timeout: parseInt(document.getElementById("mpgs_timeout").value) };
             document.getElementById("mpgs_result").innerHTML = "<pre>Загрузка...</pre>";
@@ -1495,15 +1470,11 @@ func buildIndexHTML(cfg *Config) string {
                     'Текст: <input id="table_' + i + '_row' + j + '_text" value="" style="width:80px" placeholder="0" type="number"> ' +
                     'Изобр: ' + buildImgSelectHTML('table_' + i + '_row' + j + '_img', '-', validImgs) +
                     '<div style="margin-top:5px"><strong>Зоны:</strong> <span id="table_' + i + '_row' + j + '_zones_display">-</span> <strong>Этажи:</strong> <span id="table_' + i + '_row' + j + '_floors_display">-</span></div>' +
-                    '<div class="checkbox-group"><div id="table_' + i + '_row' + j + '_zonecheckboxes">Зоны: нет данных</div> <div id="table_' + i + '_row' + j + '_floorcheckboxes">Этажи: нет данных</div></div>' +</div>';
+                    '<div class="checkbox-group"><div id="table_' + i + '_row' + j + '_zonecheckboxes">Зоны: нет данных</div> <div id="table_' + i + '_row' + j + '_floorcheckboxes">Этажи: нет данных</div></div>' +
+                    '<button onclick="updateRowValue(' + i + ', ' + j + ')" style="background:#ff9800;padding:5px 10px;font-size:12px">Обновить из MPGS</button></div>';
             }
             div.innerHTML = '<button class="remove-btn danger" onclick="removeTable(' + i + ')">X</button>' +
-                '<h3 style="display:flex;align-items:center;gap:8px">' +
-                '<span id="table_' + i + '_name_display">Табло ' + (i+1) + '</span>' +
-                '<input id="table_' + i + '_name" value="Табло ' + (i+1) + '" style="display:none;font-size:16px;font-weight:bold;border:1px solid #1a73e8;background:white;padding:4px;width:200px;border-radius:4px" placeholder="Название">' +
-                '<button onclick="editTableName(' + i + ')" id="table_' + i + '_editbtn" style="background:none;border:none;cursor:pointer;font-size:16px;padding:0" title="Редактировать название">✏️</button>' +
-                '<button onclick="saveTableName(' + i + ')" id="table_' + i + '_savebtn" style="display:none;background:#28a745;color:white;border:none;border-radius:4px;cursor:pointer;padding:4px 10px;font-size:14px" title="Сохранить">💾</button>' +
-                '</h3>' +
+                '<h3><input id="table_' + i + '_name" value="Табло ' + (i+1) + '" style="font-size:16px;font-weight:bold;border:1px solid transparent;background:transparent;width:200px;padding:4px" placeholder="Название" onfocus="this.style.borderColor=\'#1a73e8\';this.style.background=\'white\'" onblur="this.style.borderColor=\'transparent\';this.style.background=\'transparent\'"></h3>' +
                 '<div class="row"><div class="col"><label>IP</label><input id="table_' + i + '_ip" value="192.168.50.241"></div>' +
                 '<div class="col"><label>Порт</label><input type="number" id="table_' + i + '_port" value="8090"></div>' +
                 '<div class="col"><label>Шаблон</label><select id="table_' + i + '_pattern" onchange="onPatternChange(' + i + ')"><option value="0">0 (4 строки)</option><option value="1">1 (3 строки)</option><option value="2">2 (1 строка)</option></select></div>' +
@@ -1522,8 +1493,8 @@ func buildIndexHTML(cfg *Config) string {
                 if (!ipElem) continue;
                 var pattern = parseInt(document.getElementById("table_" + i + "_pattern").value);
                 var maxRows = getMaxRows(pattern);
-                var nameDisplay = document.getElementById("table_" + i + "_name_display");
-                var table = { name: nameDisplay ? nameDisplay.textContent : "", ip: ipElem.value, port: parseInt(document.getElementById("table_" + i + "_port").value), mode: "push", pattern: pattern, day_mode: document.getElementById("table_" + i + "_daymode").value };
+                var nameElem = document.getElementById("table_" + i + "_name");
+                var table = { name: nameElem ? nameElem.value : "", ip: ipElem.value, port: parseInt(document.getElementById("table_" + i + "_port").value), mode: "push", pattern: pattern, day_mode: document.getElementById("table_" + i + "_daymode").value };
                 for (var j = 1; j <= maxRows; j++) {
                     var textElem = document.getElementById("table_" + i + "_row" + j + "_text");
                     var imgElem = document.getElementById("table_" + i + "_row" + j + "_img");
@@ -1556,7 +1527,7 @@ func buildIndexHTML(cfg *Config) string {
                 var table = savedTables[i];
                 if (table.pattern !== undefined) { document.getElementById("table_" + i + "_pattern").value = table.pattern; onPatternChange(i); }
                 if (table.day_mode) { document.getElementById("table_" + i + "_daymode").value = table.day_mode; }
-                if (table.name) { var nd = document.getElementById("table_" + i + "_name_display"); var ni = document.getElementById("table_" + i + "_name"); if (nd) nd.textContent = table.name; if (ni) ni.value = table.name; }
+                if (table.name) { var ne = document.getElementById("table_" + i + "_name"); if (ne) ne.value = table.name; }
                 var maxRows = getMaxRows(table.pattern || 0);
                 for (var j = 1; j <= maxRows; j++) {
                     var row = table['row' + j];
@@ -1880,7 +1851,7 @@ main() {
     clear
     echo ""
     echo "============================================="
-    echo "  RPS for Yandex Installation Script v5.4.0"
+    echo "  RPS for Yandex Installation Script v5.3.0"
     echo "============================================="
     echo ""
     mkdir -p "$PROJECT_DIR"

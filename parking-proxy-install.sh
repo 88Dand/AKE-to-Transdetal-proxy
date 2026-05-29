@@ -1,12 +1,12 @@
 #!/bin/bash
 ###############################################################################
 # ParkingProxy - Complete Installation Script
-# Версия: 5.1.1
+# Версия: 5.1.0
 # Описание: Автоматическое развёртывание RPS for Yandex
 ###############################################################################
 
 set -o pipefail
- 
+
 # Цвета для вывода
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -1933,7 +1933,7 @@ main() {
     clear
     echo ""
     echo "============================================="
-    echo "  RPS for Yandex Installation Script v5.1.0"
+    echo "  RPS for Yandex Installation Script v5.1.1"
     echo "============================================="
     echo ""
     mkdir -p "$PROJECT_DIR"

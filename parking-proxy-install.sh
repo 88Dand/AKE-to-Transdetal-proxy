@@ -1473,8 +1473,8 @@ func buildIndexHTML(cfg *Config) string {
             div.innerHTML = '<button class="remove-btn danger" onclick="removeTable(' + i + ')">X</button><h3>Табло ' + i + '</h3>' +
                 '<div class="row"><div class="col"><label>IP</label><input id="table_' + i + '_ip" value="192.168.50.241"></div>' +
                 '<div class="col"><label>Порт</label><input type="number" id="table_' + i + '_port" value="8090"></div>' +
-                '<div class="col"><label>Шаблон</label><select id="table_' + i + '_pattern" onchange="onPatternChange(' + i + ')"><option value="0">0 (4 строки)</option><option value="1">1 (3 строки)</option><option value="2">2 (1 строка)</option></select></div></div>' +
-                '<div class="row"><div class="col"><label>День/ночь</label><select id="table_' + i + '_daymode"><option value="auto">Авто</option><option value="day">День</option><option value="night">Ночь</option></select></div></div>' +
+                '<div class="col"><label>Шаблон</label><select id="table_' + i + '_pattern" onchange="onPatternChange(' + i + ')"><option value="0">0 (4 строки)</option><option value="1">1 (3 строки)</option><option value="2">2 (1 строка)</option></select></div>' +
+                '<div class="col"><label>День/ночь</label><select id="table_' + i + '_daymode"><option value="auto">Авто</option><option value="day">День</option><option value="night">Ночь</option></select></div></div>' +
                 '<div id="table_' + i + '_rows">' + rowsHTML + '</div><button onclick="testTable(' + i + ')">Тест отправки</button><div id="table_' + i + '_result" class="result"></div>';
             container.appendChild(div);
             if (lastMPGSData) { for (var j = 1; j <= 4; j++) updateRowCheckboxes(i, j, lastMPGSData); }

@@ -1,7 +1,7 @@
 #!/bin/bash
 ###############################################################################
-# ParkingProxy - Complete Installation Script
-# Версия: 5.2.0
+# RPS for Yandex - Complete Installation Script
+# Версия: 5.3.0
 # Описание: Автоматическое развёртывание RPS for Yandex
 ###############################################################################
 
@@ -409,6 +409,7 @@ type TableConfig struct {
     Mode    string     `json:"mode"`
     Pattern int        `json:"pattern"`
     DayMode string     `json:"day_mode"`
+    Name    string     `json:"name"`
     Row1    *RowConfig `json:"row1,omitempty"`
     Row2    *RowConfig `json:"row2,omitempty"`
     Row3    *RowConfig `json:"row3,omitempty"`
@@ -1185,7 +1186,7 @@ func buildIndexHTML(cfg *Config) string {
         tablesHTML += fmt.Sprintf(`
         <div class="table-block" id="table_%d">
             <button class="remove-btn danger" onclick="removeTable(%d)">X</button>
-            <h3>Табло %d</h3>
+            <h3><input id="table_%d_name" value="%s" style="font-size:16px;font-weight:bold;border:none;background:transparent;width:200px" placeholder="Название"></h3>
             <div class="row">
                 <div class="col"><label>IP</label><input id="table_%d_ip" value="%s"></div>
                 <div class="col"><label>Порт</label><input id="table_%d_port" value="%d" type="number"></div>
@@ -1195,7 +1196,7 @@ func buildIndexHTML(cfg *Config) string {
             <div id="table_%d_rows">%s</div>
             <button onclick="testTable(%d)">Тест отправки</button>
             <div id="table_%d_result" class="result"></div>
-        </div>`, i, i, i, i, t.IP, i, t.Port,
+        </div>`, i, i, i, t.Name, i, t.IP, i, t.Port,
             i, i,
             map[bool]string{true: " selected", false: ""}[t.Pattern == 0],
             map[bool]string{true: " selected", false: ""}[t.Pattern == 1],
@@ -1244,6 +1245,8 @@ func buildIndexHTML(cfg *Config) string {
         .checkbox-group { display: flex; flex-wrap: wrap; gap: 8px; margin: 5px 0; }
         .checkbox-group label { display: inline-flex; align-items: center; gap: 3px; font-weight: normal; cursor: pointer; font-size: 13px; }
         .checkbox-group input[type=checkbox] { width: auto; }
+        .table-block h3 input { font-size: 16px; font-weight: bold; border: 1px solid transparent; background: transparent; width: 200px; padding: 4px; }
+        .table-block h3 input:focus { border-color: #1a73e8; background: white; outline: none; }
     </style>
 </head>
 <body>
@@ -1470,7 +1473,8 @@ func buildIndexHTML(cfg *Config) string {
                     '<div class="checkbox-group"><div id="table_' + i + '_row' + j + '_zonecheckboxes">Зоны: нет данных</div> <div id="table_' + i + '_row' + j + '_floorcheckboxes">Этажи: нет данных</div></div>' +
                     '<button onclick="updateRowValue(' + i + ', ' + j + ')" style="background:#ff9800;padding:5px 10px;font-size:12px">Обновить из MPGS</button></div>';
             }
-            div.innerHTML = '<button class="remove-btn danger" onclick="removeTable(' + i + ')">X</button><h3>Табло ' + i + '</h3>' +
+            div.innerHTML = '<button class="remove-btn danger" onclick="removeTable(' + i + ')">X</button>' +
+                '<h3><input id="table_' + i + '_name" value="Табло ' + (i+1) + '" style="font-size:16px;font-weight:bold;border:1px solid transparent;background:transparent;width:200px;padding:4px" placeholder="Название" onfocus="this.style.borderColor=\'#1a73e8\';this.style.background=\'white\'" onblur="this.style.borderColor=\'transparent\';this.style.background=\'transparent\'"></h3>' +
                 '<div class="row"><div class="col"><label>IP</label><input id="table_' + i + '_ip" value="192.168.50.241"></div>' +
                 '<div class="col"><label>Порт</label><input type="number" id="table_' + i + '_port" value="8090"></div>' +
                 '<div class="col"><label>Шаблон</label><select id="table_' + i + '_pattern" onchange="onPatternChange(' + i + ')"><option value="0">0 (4 строки)</option><option value="1">1 (3 строки)</option><option value="2">2 (1 строка)</option></select></div>' +
@@ -1489,7 +1493,8 @@ func buildIndexHTML(cfg *Config) string {
                 if (!ipElem) continue;
                 var pattern = parseInt(document.getElementById("table_" + i + "_pattern").value);
                 var maxRows = getMaxRows(pattern);
-                var table = { ip: ipElem.value, port: parseInt(document.getElementById("table_" + i + "_port").value), mode: "push", pattern: pattern, day_mode: document.getElementById("table_" + i + "_daymode").value };
+                var nameElem = document.getElementById("table_" + i + "_name");
+                var table = { name: nameElem ? nameElem.value : "", ip: ipElem.value, port: parseInt(document.getElementById("table_" + i + "_port").value), mode: "push", pattern: pattern, day_mode: document.getElementById("table_" + i + "_daymode").value };
                 for (var j = 1; j <= maxRows; j++) {
                     var textElem = document.getElementById("table_" + i + "_row" + j + "_text");
                     var imgElem = document.getElementById("table_" + i + "_row" + j + "_img");
@@ -1522,6 +1527,7 @@ func buildIndexHTML(cfg *Config) string {
                 var table = savedTables[i];
                 if (table.pattern !== undefined) { document.getElementById("table_" + i + "_pattern").value = table.pattern; onPatternChange(i); }
                 if (table.day_mode) { document.getElementById("table_" + i + "_daymode").value = table.day_mode; }
+                if (table.name) { var ne = document.getElementById("table_" + i + "_name"); if (ne) ne.value = table.name; }
                 var maxRows = getMaxRows(table.pattern || 0);
                 for (var j = 1; j <= maxRows; j++) {
                     var row = table['row' + j];
@@ -1730,7 +1736,7 @@ create_config() {
   "log_level": "debug",
   "sunrise_hour": 7,
   "sunset_hour": 18,
-  "tables": [{ "ip": "${TABLE1_IP}", "port": ${TABLE1_PORT}, "mode": "push", "pattern": 0, "day_mode": "auto",
+  "tables": [{ "name": "Табло 1", "ip": "${TABLE1_IP}", "port": ${TABLE1_PORT}, "mode": "push", "pattern": 0, "day_mode": "auto",
     "row1": {"text": "", "img": "", "zones": [], "floors": []},
     "row2": {"text": "", "img": "", "zones": [], "floors": []},
     "row3": {"text": "", "img": "", "zones": [], "floors": []},
@@ -1845,7 +1851,7 @@ main() {
     clear
     echo ""
     echo "============================================="
-    echo "  RPS for Yandex Installation Script v5.2.1"
+    echo "  RPS for Yandex Installation Script v5.3.0"
     echo "============================================="
     echo ""
     mkdir -p "$PROJECT_DIR"

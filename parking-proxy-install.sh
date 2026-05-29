@@ -1177,6 +1177,7 @@ func buildIndexHTML(cfg *Config) string {
                     <div id="table_%d_row%d_zonecheckboxes" style="display:inline">Зоны: нет данных</div>
                     <div id="table_%d_row%d_floorcheckboxes" style="display:inline;margin-left:10px">Этажи: нет данных</div>
                 </div>
+                <button onclick="updateRowValue(%d, %d)" style="background:#ff9800;padding:5px 10px;font-size:12px">Обновить из MPGS</button>
             </div>`, i, j, displayStyle, j, i, j, i, j, textVal,
                 buildImgSelect(fmt.Sprintf("table_%d_row%d_img", i, j), imgVal, validImgs),
                 i, j, i, j, i, j, i, j)
@@ -1496,6 +1497,9 @@ func buildIndexHTML(cfg *Config) string {
                     'Изобр: ' + buildImgSelectHTML('table_' + i + '_row' + j + '_img', '-', validImgs) +
                     '<div style="margin-top:5px"><strong>Зоны:</strong> <span id="table_' + i + '_row' + j + '_zones_display">-</span> <strong>Этажи:</strong> <span id="table_' + i + '_row' + j + '_floors_display">-</span></div>' +
                     '<div class="checkbox-group"><div id="table_' + i + '_row' + j + '_zonecheckboxes">Зоны: нет данных</div> <div id="table_' + i + '_row' + j + '_floorcheckboxes">Этажи: нет данных</div></div>' +
+                    '<button onclick="updateRowValue(' + i + ', ' + j + ')" style="background:#ff9800;padding:5px 10px;font-size:12px">Обновить из MPGS</button></div>';
+            }
+            div.innerHTML = '<button class="remove-btn danger" onclick="removeTable(' + i + ')">X</button>' +
                 '<h3 style="display:flex;align-items:center;gap:8px">' +
                 '<span id="table_' + i + '_name_display">Табло ' + (i+1) + '</span>' +
                 '<input id="table_' + i + '_name" value="Табло ' + (i+1) + '" style="display:none;font-size:16px;font-weight:bold;border:1px solid #1a73e8;background:white;padding:4px;width:200px;border-radius:4px" placeholder="Название">' +

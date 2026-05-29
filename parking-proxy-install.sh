@@ -1,7 +1,7 @@
 #!/bin/bash
 ###############################################################################
 # ParkingProxy - Complete Installation Script
-# Версия: 5.1.1
+# Версия: 5.2.0
 # Описание: Автоматическое развёртывание RPS for Yandex
 ###############################################################################
 
@@ -403,12 +403,12 @@ type MPGSConfig struct {
     Timeout int    `json:"timeout_sec"`
 }
 
-
 type TableConfig struct {
     IP      string     `json:"ip"`
     Port    int        `json:"port"`
     Mode    string     `json:"mode"`
     Pattern int        `json:"pattern"`
+    DayMode string     `json:"day_mode"`
     Row1    *RowConfig `json:"row1,omitempty"`
     Row2    *RowConfig `json:"row2,omitempty"`
     Row3    *RowConfig `json:"row3,omitempty"`
@@ -428,12 +428,12 @@ type Location struct {
 }
 
 type Config struct {
-    MPGS         MPGSConfig       `json:"mpgs"`
-    Tables       []TableConfig    `json:"tables"`
-    Location     Location         `json:"location"`
-    LogLevel     string           `json:"log_level"`
-    SunriseHour  int              `json:"sunrise_hour"`
-    SunsetHour   int              `json:"sunset_hour"`
+    MPGS        MPGSConfig    `json:"mpgs"`
+    Tables      []TableConfig `json:"tables"`
+    Location    Location      `json:"location"`
+    LogLevel    string        `json:"log_level"`
+    SunriseHour int           `json:"sunrise_hour"`
+    SunsetHour  int           `json:"sunset_hour"`
 }
 
 var (
@@ -771,6 +771,12 @@ func getValidImages(pattern int) []string {
     return base
 }
 
+func getTableDaytime(t TableConfig) bool {
+    if t.DayMode == "day" { return true }
+    if t.DayMode == "night" { return false }
+    return isDaytime()
+}
+
 func (p *Processor) Process(data []SpaceInfo, cfg *Config) (map[string]TablePayload, bool) {
     p.mu.Lock()
     defer p.mu.Unlock()
@@ -803,7 +809,7 @@ func (p *Processor) Process(data []SpaceInfo, cfg *Config) (map[string]TablePayl
             Type:    "strs",
             Version: 1,
             Pattern: t.Pattern,
-            IsDay:   isDaytime(),
+            IsDay:   getTableDaytime(t),
         }
 
         hasAnyRow := false
@@ -1116,8 +1122,6 @@ func (ws *WebServer) handleIndex(w http.ResponseWriter, r *http.Request) {
     w.Write([]byte(buildIndexHTML(cfg)))
 }
 
-var allImgOptions = []string{"-", "car", "ecar", "moto", "2car", "arrow_up", "arrow_down", "arrow_left", "arrow_right"}
-
 func buildImgSelect(id string, selected string, imgs []string) string {
     html := fmt.Sprintf(`<select id="%s">`, id)
     for _, img := range imgs {
@@ -1187,7 +1191,9 @@ func buildIndexHTML(cfg *Config) string {
                 <div class="col"><label>Порт</label><input id="table_%d_port" value="%d" type="number"></div>
                 <div class="col"><label>Шаблон</label><select id="table_%d_pattern" onchange="onPatternChange(%d)"><option value="0"%s>0 (4 строки)</option><option value="1"%s>1 (3 строки)</option><option value="2"%s>2 (1 строка)</option></select></div>
             </div>
-            <div class="form-group"><label>is_day</label><select id="table_%d_isday"><option value="true">true (день)</option><option value="false">false (ночь)</option></select></div>
+            <div class="row">
+                <div class="col"><label>День/ночь</label><select id="table_%d_daymode"><option value="auto"%s>Авто</option><option value="day"%s>День</option><option value="night"%s>Ночь</option></select></div>
+            </div>
             <div id="table_%d_rows">%s</div>
             <button onclick="testTable(%d)">Тест отправки</button>
             <div id="table_%d_result" class="result"></div>
@@ -1196,7 +1202,11 @@ func buildIndexHTML(cfg *Config) string {
             map[bool]string{true: " selected", false: ""}[t.Pattern == 0],
             map[bool]string{true: " selected", false: ""}[t.Pattern == 1],
             map[bool]string{true: " selected", false: ""}[t.Pattern == 2],
-            i, i, rowsHTML, i, i)
+            i,
+            map[bool]string{true: " selected", false: ""}[t.DayMode == "auto" || t.DayMode == ""],
+            map[bool]string{true: " selected", false: ""}[t.DayMode == "day"],
+            map[bool]string{true: " selected", false: ""}[t.DayMode == "night"],
+            i, rowsHTML, i, i)
     }
 
     html := fmt.Sprintf(`<!DOCTYPE html>
@@ -1267,15 +1277,10 @@ func buildIndexHTML(cfg *Config) string {
             <button onclick="saveConfig()">Сохранить конфиг</button>
             <div id="save_result" class="result"></div>
         </div>
-        <div class="block">
-
-            <div id="daynight_result" class="result"></div>
-        </div>
     </div>
     <script>
         let tablesCount = %d;
         let lastMPGSData = null;
-        const allImgs = ["-", "car", "ecar", "moto", "2car", "arrow_up", "arrow_down", "arrow_left", "arrow_right"];
 
         function getValidImages(pattern) {
             if (pattern == 2) return ["-", "car", "ecar", "moto", "2car", "arrow_up", "arrow_down", "arrow_left", "arrow_right"];
@@ -1292,23 +1297,18 @@ func buildIndexHTML(cfg *Config) string {
             var pattern = parseInt(document.getElementById("table_" + tableIdx + "_pattern").value);
             var maxRows = getMaxRows(pattern);
             var validImgs = getValidImages(pattern);
-
             for (var j = 1; j <= 4; j++) {
                 var container = document.getElementById("table_" + tableIdx + "_row" + j + "_container");
                 if (!container) continue;
                 if (j <= maxRows) {
                     container.style.display = "";
-                    // Обновить выпадающий список img
                     var imgSelect = document.getElementById("table_" + tableIdx + "_row" + j + "_img");
                     if (imgSelect) {
                         var currentVal = imgSelect.value;
-                        imgSelect.innerHTML = validImgs.map(function(img) {
-                            return '<option value="' + img + '"' + (img === currentVal ? ' selected' : '') + '>' + img + '</option>';
-                        }).join('');
+                        imgSelect.innerHTML = validImgs.map(function(img) { return '<option value="' + img + '"' + (img === currentVal ? ' selected' : '') + '>' + img + '</option>'; }).join('');
                     }
                 } else {
                     container.style.display = "none";
-                    // Очистить скрытые строки
                     var textElem = document.getElementById("table_" + tableIdx + "_row" + j + "_text");
                     if (textElem) textElem.value = "";
                     clearRow(tableIdx, j);
@@ -1318,9 +1318,7 @@ func buildIndexHTML(cfg *Config) string {
 
         function buildImgSelectHTML(id, selected, imgs) {
             var html = '<select id="' + id + '">';
-            imgs.forEach(function(img) {
-                html += '<option value="' + img + '"' + (img === selected ? ' selected' : '') + '>' + img + '</option>';
-            });
+            imgs.forEach(function(img) { html += '<option value="' + img + '"' + (img === selected ? ' selected' : '') + '>' + img + '</option>'; });
             html += '</select>';
             return html;
         }
@@ -1335,36 +1333,23 @@ func buildIndexHTML(cfg *Config) string {
                 html += '<div class="stat-card"><div class="value" style="color:red">' + result.total_occupied + '</div><div class="label">Занято</div></div>';
                 html += '<div class="stat-card"><div class="value">' + result.elapsed_ms + 'мс</div><div class="label">Время ответа</div></div>';
                 html += '</div>';
-
                 if (result.zones && Object.keys(result.zones).length > 0) {
                     html += '<h3>По зонам</h3><table><tr><th>Зона</th><th>Всего</th><th>Свободно</th><th>Занято</th></tr>';
-                    for (var zone in result.zones) {
-                        var z = result.zones[zone];
-                        html += '<tr><td>' + zone + '</td><td>' + z.total + '</td><td style="color:green">' + z.free + '</td><td style="color:red">' + z.occupied + '</td></tr>';
-                    }
+                    for (var zone in result.zones) { var z = result.zones[zone]; html += '<tr><td>' + zone + '</td><td>' + z.total + '</td><td style="color:green">' + z.free + '</td><td style="color:red">' + z.occupied + '</td></tr>'; }
                     html += '</table>';
                 }
                 if (result.floors && Object.keys(result.floors).length > 0) {
                     html += '<h3>По этажам</h3><table><tr><th>Этаж</th><th>Всего</th><th>Свободно</th><th>Занято</th></tr>';
-                    for (var floor in result.floors) {
-                        var f = result.floors[floor];
-                        html += '<tr><td>' + floor + '</td><td>' + f.total + '</td><td style="color:green">' + f.free + '</td><td style="color:red">' + f.occupied + '</td></tr>';
-                    }
+                    for (var floor in result.floors) { var f = result.floors[floor]; html += '<tr><td>' + floor + '</td><td>' + f.total + '</td><td style="color:green">' + f.free + '</td><td style="color:red">' + f.occupied + '</td></tr>'; }
                     html += '</table>';
                 }
                 html += '<h3>Детальные данные</h3><pre>' + JSON.stringify(result.spaces, null, 2) + '</pre>';
                 updateAllCheckboxes(result);
-            } else {
-                html += '<pre style="color:red">Ошибка (' + result.elapsed_ms + 'мс): ' + result.error + '</pre>';
-            }
+            } else { html += '<pre style="color:red">Ошибка (' + result.elapsed_ms + 'мс): ' + result.error + '</pre>'; }
             return html;
         }
 
-        function updateAllCheckboxes(data) {
-            for (var i = 0; i < tablesCount; i++) {
-                for (var j = 1; j <= 4; j++) { updateRowCheckboxes(i, j, data); }
-            }
-        }
+        function updateAllCheckboxes(data) { for (var i = 0; i < tablesCount; i++) { for (var j = 1; j <= 4; j++) { updateRowCheckboxes(i, j, data); } } }
 
         function updateRowCheckboxes(tableIdx, rowIdx, data) {
             var zoneDiv = document.getElementById('table_' + tableIdx + '_row' + rowIdx + '_zonecheckboxes');
@@ -1386,10 +1371,7 @@ func buildIndexHTML(cfg *Config) string {
             if (!lastMPGSData) return;
             var selectedZones = getCheckedValues(tableIdx, rowIdx, 'zone');
             var selectedFloors = getCheckedValues(tableIdx, rowIdx, 'floor');
-            if (selectedZones.length === 0 && selectedFloors.length === 0) {
-                document.getElementById('table_' + tableIdx + '_row' + rowIdx + '_text').value = '0';
-                return;
-            }
+            if (selectedZones.length === 0 && selectedFloors.length === 0) { document.getElementById('table_' + tableIdx + '_row' + rowIdx + '_text').value = '0'; return; }
             var totalFree = 0;
             if (lastMPGSData.spaces) {
                 lastMPGSData.spaces.forEach(function(space) {
@@ -1401,26 +1383,19 @@ func buildIndexHTML(cfg *Config) string {
                 });
             }
             document.getElementById('table_' + tableIdx + '_row' + rowIdx + '_text').value = totalFree;
-            var zonesDisplay = document.getElementById('table_' + tableIdx + '_row' + rowIdx + '_zones_display');
-            var floorsDisplay = document.getElementById('table_' + tableIdx + '_row' + rowIdx + '_floors_display');
-            if (zonesDisplay) zonesDisplay.textContent = selectedZones.join(', ') || 'нет';
-            if (floorsDisplay) floorsDisplay.textContent = selectedFloors.join(', ') || 'нет';
         }
 
         function clearRow(tableIdx, rowIdx) {
             document.getElementById('table_' + tableIdx + '_row' + rowIdx + '_text').value = '';
             var checkboxes = document.querySelectorAll('.table_' + tableIdx + '_row' + rowIdx + '_zone:checked, .table_' + tableIdx + '_row' + rowIdx + '_floor:checked');
             checkboxes.forEach(function(cb) { cb.checked = false; });
-            document.getElementById('table_' + tableIdx + '_row' + rowIdx + '_zones_display').textContent = '-';
-            document.getElementById('table_' + tableIdx + '_row' + rowIdx + '_floors_display').textContent = '-';
         }
 
         function testMPGS() {
             var data = { base_url: document.getElementById("mpgs_url").value, key: document.getElementById("mpgs_key").value, secret: document.getElementById("mpgs_secret").value, version: "V3.6.0", timeout: parseInt(document.getElementById("mpgs_timeout").value) };
             document.getElementById("mpgs_result").innerHTML = "<pre>Загрузка...</pre>";
             fetch("/api/test-mpgs", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(data) })
-            .then(function(r) { return r.json(); })
-            .then(function(result) { document.getElementById("mpgs_result").innerHTML = formatMPGSResult(result); });
+            .then(function(r) { return r.json(); }).then(function(result) { document.getElementById("mpgs_result").innerHTML = formatMPGSResult(result); });
         }
 
         function testTable(i) {
@@ -1443,14 +1418,13 @@ func buildIndexHTML(cfg *Config) string {
                     }
                 }
             }
-
+            var dayMode = document.getElementById("table_" + i + "_daymode").value;
             var data = {
                 ip: document.getElementById("table_" + i + "_ip").value,
                 port: parseInt(document.getElementById("table_" + i + "_port").value),
                 pattern: parseInt(document.getElementById("table_" + i + "_pattern").value),
-                is_day: document.getElementById("table_" + i + "_isday").value === "true"
+                is_day: dayMode === "day" ? true : (dayMode === "night" ? false : true)
             };
-
             var hasAnyRow = false;
             var maxRows = getMaxRows(data.pattern);
             for (var j = 1; j <= maxRows; j++) {
@@ -1468,24 +1442,13 @@ func buildIndexHTML(cfg *Config) string {
                     hasAnyRow = true;
                 }
             }
-
-            if (!hasAnyRow) {
-                document.getElementById("table_" + i + "_result").innerHTML = "<pre style='color:orange'>Нет строк для отправки</pre>";
-                return;
-            }
-
+            if (!hasAnyRow) { document.getElementById("table_" + i + "_result").innerHTML = "<pre style='color:orange'>Нет строк для отправки</pre>"; return; }
             document.getElementById("table_" + i + "_result").innerHTML = "<pre>Отправка...</pre>";
             fetch("/api/test-table", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(data) })
-            .then(function(r) { return r.json(); })
-            .then(function(result) {
+            .then(function(r) { return r.json(); }).then(function(result) {
                 var html = "";
-                if (result.success) {
-                    html += "<div class='stat-card'><div class='value' style='color:green'>OK</div><div class='label'>" + result.elapsed_ms + "мс</div></div>";
-                    html += "<pre>Ответ: " + result.response + "</pre>";
-                } else {
-                    html += "<div class='stat-card'><div class='value' style='color:red'>ОШИБКА</div><div class='label'>" + result.elapsed_ms + "мс</div></div>";
-                    html += "<pre>Ошибка: " + (result.error || "статус " + result.status) + "</pre>";
-                }
+                if (result.success) { html += "<div class='stat-card'><div class='value' style='color:green'>OK</div><div class='label'>" + result.elapsed_ms + "мс</div></div><pre>Ответ: " + result.response + "</pre>"; }
+                else { html += "<div class='stat-card'><div class='value' style='color:red'>ОШИБКА</div><div class='label'>" + result.elapsed_ms + "мс</div></div><pre>Ошибка: " + (result.error || "статус " + result.status) + "</pre>"; }
                 html += "<pre>Отправлено:\n" + JSON.stringify(JSON.parse(result.payload), null, 2) + "</pre>";
                 document.getElementById("table_" + i + "_result").innerHTML = html;
             });
@@ -1497,7 +1460,6 @@ func buildIndexHTML(cfg *Config) string {
             var div = document.createElement("div");
             div.className = "table-block";
             div.id = "table_" + i;
-
             var rowsHTML = '';
             var validImgs = getValidImages(0);
             for (var j = 1; j <= 4; j++) {
@@ -1508,19 +1470,14 @@ func buildIndexHTML(cfg *Config) string {
                     'Изобр: ' + buildImgSelectHTML('table_' + i + '_row' + j + '_img', '-', validImgs) +
                     '<div style="margin-top:5px"><strong>Зоны:</strong> <span id="table_' + i + '_row' + j + '_zones_display">-</span> <strong>Этажи:</strong> <span id="table_' + i + '_row' + j + '_floors_display">-</span></div>' +
                     '<div class="checkbox-group"><div id="table_' + i + '_row' + j + '_zonecheckboxes">Зоны: нет данных</div> <div id="table_' + i + '_row' + j + '_floorcheckboxes">Этажи: нет данных</div></div>' +
-                    '<button onclick="updateRowValue(' + i + ', ' + j + ')" style="background:#ff9800;padding:5px 10px;font-size:12px">Обновить из MPGS</button>' +
-                    '</div>';
+                    '<button onclick="updateRowValue(' + i + ', ' + j + ')" style="background:#ff9800;padding:5px 10px;font-size:12px">Обновить из MPGS</button></div>';
             }
-
-            div.innerHTML = '<button class="remove-btn danger" onclick="removeTable(' + i + ')">X</button>' +
-                '<h3>Табло ' + i + '</h3>' +
+            div.innerHTML = '<button class="remove-btn danger" onclick="removeTable(' + i + ')">X</button><h3>Табло ' + i + '</h3>' +
                 '<div class="row"><div class="col"><label>IP</label><input id="table_' + i + '_ip" value="192.168.50.241"></div>' +
                 '<div class="col"><label>Порт</label><input type="number" id="table_' + i + '_port" value="8090"></div>' +
                 '<div class="col"><label>Шаблон</label><select id="table_' + i + '_pattern" onchange="onPatternChange(' + i + ')"><option value="0">0 (4 строки)</option><option value="1">1 (3 строки)</option><option value="2">2 (1 строка)</option></select></div></div>' +
-                '<div class="form-group"><label>is_day</label><select id="table_' + i + '_isday"><option value="true">true (день)</option><option value="false">false (ночь)</option></select></div>' +
-                '<div id="table_' + i + '_rows">' + rowsHTML + '</div>' +
-                '<button onclick="testTable(' + i + ')">Тест отправки</button>' +
-                '<div id="table_' + i + '_result" class="result"></div>';
+                '<div class="row"><div class="col"><label>День/ночь</label><select id="table_' + i + '_daymode"><option value="auto">Авто</option><option value="day">День</option><option value="night">Ночь</option></select></div></div>' +
+                '<div id="table_' + i + '_rows">' + rowsHTML + '</div><button onclick="testTable(' + i + ')">Тест отправки</button><div id="table_' + i + '_result" class="result"></div>';
             container.appendChild(div);
             if (lastMPGSData) { for (var j = 1; j <= 4; j++) updateRowCheckboxes(i, j, lastMPGSData); }
         }
@@ -1534,8 +1491,7 @@ func buildIndexHTML(cfg *Config) string {
                 if (!ipElem) continue;
                 var pattern = parseInt(document.getElementById("table_" + i + "_pattern").value);
                 var maxRows = getMaxRows(pattern);
-                var table = { ip: ipElem.value, port: parseInt(document.getElementById("table_" + i + "_port").value), mode: "push", pattern: pattern };
-
+                var table = { ip: ipElem.value, port: parseInt(document.getElementById("table_" + i + "_port").value), mode: "push", pattern: pattern, day_mode: document.getElementById("table_" + i + "_daymode").value };
                 for (var j = 1; j <= maxRows; j++) {
                     var textElem = document.getElementById("table_" + i + "_row" + j + "_text");
                     var imgElem = document.getElementById("table_" + i + "_row" + j + "_img");
@@ -1544,9 +1500,7 @@ func buildIndexHTML(cfg *Config) string {
                     var selectedZones = getCheckedValues(i, j, 'zone');
                     var selectedFloors = getCheckedValues(i, j, 'floor');
                     var hasSelection = selectedZones.length > 0 || selectedFloors.length > 0;
-                    if (hasSelection && textVal !== "") {
-                        table["row" + j] = { text: textVal, img: imgVal === "-" ? "" : imgVal, zones: selectedZones, floors: selectedFloors };
-                    }
+                    if (hasSelection && textVal !== "") { table["row" + j] = { text: textVal, img: imgVal === "-" ? "" : imgVal, zones: selectedZones, floors: selectedFloors }; }
                 }
                 tables.push(table);
             }
@@ -1559,8 +1513,7 @@ func buildIndexHTML(cfg *Config) string {
                 tables: tables
             };
             fetch("/api/save-config", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(config) })
-            .then(function(r) { return r.json(); })
-            .then(function(result) { document.getElementById("save_result").innerHTML = "<pre>" + JSON.stringify(result, null, 2) + "</pre>"; });
+            .then(function(r) { return r.json(); }).then(function(result) { document.getElementById("save_result").innerHTML = "<pre>" + JSON.stringify(result, null, 2) + "</pre>"; });
         }
 
         function loadSavedCheckboxes() {
@@ -1569,10 +1522,8 @@ func buildIndexHTML(cfg *Config) string {
             if (!savedTables || savedTables.length === 0) return;
             for (var i = 0; i < savedTables.length; i++) {
                 var table = savedTables[i];
-                if (table.pattern !== undefined) {
-                    document.getElementById("table_" + i + "_pattern").value = table.pattern;
-                    onPatternChange(i);
-                }
+                if (table.pattern !== undefined) { document.getElementById("table_" + i + "_pattern").value = table.pattern; onPatternChange(i); }
+                if (table.day_mode) { document.getElementById("table_" + i + "_daymode").value = table.day_mode; }
                 var maxRows = getMaxRows(table.pattern || 0);
                 for (var j = 1; j <= maxRows; j++) {
                     var row = table['row' + j];
@@ -1588,7 +1539,7 @@ func buildIndexHTML(cfg *Config) string {
             }
         }
 
-         testMPGS();
+        testMPGS();
         setTimeout(loadSavedCheckboxes, 3000);
     </script>
 </body>
@@ -1625,31 +1576,22 @@ func (ws *WebServer) handleTestMPGS(w http.ResponseWriter, r *http.Request) {
     elapsed := time.Since(startTime)
 
     result := map[string]interface{}{"elapsed_ms": elapsed.Milliseconds(), "success": err == nil}
-    if err != nil {
-        result["error"] = err.Error()
-    } else {
+    if err != nil { result["error"] = err.Error() } else {
         zones := make(map[string]map[string]int)
         floors := make(map[string]map[string]int)
         totalFree, totalOccupied := 0, 0
         for _, space := range data {
-            zone := space.BelongArea
-            if zone == "" { zone = "unknown" }
+            zone := space.BelongArea; if zone == "" { zone = "unknown" }
             if _, ok := zones[zone]; !ok { zones[zone] = map[string]int{"free": 0, "occupied": 0, "total": 0} }
             zones[zone]["total"]++
             if space.ParkingSpaceStatus == 0 { zones[zone]["free"]++; totalFree++ } else { zones[zone]["occupied"]++; totalOccupied++ }
-
-            floor := space.MapName
-            if floor == "" { floor = "unknown" }
+            floor := space.MapName; if floor == "" { floor = "unknown" }
             if _, ok := floors[floor]; !ok { floors[floor] = map[string]int{"free": 0, "occupied": 0, "total": 0} }
             floors[floor]["total"]++
             if space.ParkingSpaceStatus == 0 { floors[floor]["free"]++ } else { floors[floor]["occupied"]++ }
         }
-        result["total_spaces"] = len(data)
-        result["total_free"] = totalFree
-        result["total_occupied"] = totalOccupied
-        result["zones"] = zones
-        result["floors"] = floors
-        result["spaces"] = data
+        result["total_spaces"] = len(data); result["total_free"] = totalFree; result["total_occupied"] = totalOccupied
+        result["zones"] = zones; result["floors"] = floors; result["spaces"] = data
     }
     respondJSON(w, result)
 }
@@ -1657,40 +1599,28 @@ func (ws *WebServer) handleTestMPGS(w http.ResponseWriter, r *http.Request) {
 func (ws *WebServer) handleTestTable(w http.ResponseWriter, r *http.Request) {
     if r.Method != "POST" { http.Error(w, "Method not allowed", 405); return }
     var req struct {
-        IP      string `json:"ip"`
-        Port    int    `json:"port"`
-        Pattern int    `json:"pattern"`
-        IsDay   bool   `json:"is_day"`
-        Row1    *struct{ Text string `json:"text"`; Img string `json:"img,omitempty"` } `json:"row1"`
-        Row2    *struct{ Text string `json:"text"`; Img string `json:"img,omitempty"` } `json:"row2"`
-        Row3    *struct{ Text string `json:"text"`; Img string `json:"img,omitempty"` } `json:"row3"`
-        Row4    *struct{ Text string `json:"text"`; Img string `json:"img,omitempty"` } `json:"row4"`
+        IP      string `json:"ip"`; Port int `json:"port"`; Pattern int `json:"pattern"`; IsDay bool `json:"is_day"`
+        Row1 *struct{ Text string `json:"text"`; Img string `json:"img,omitempty"` } `json:"row1"`
+        Row2 *struct{ Text string `json:"text"`; Img string `json:"img,omitempty"` } `json:"row2"`
+        Row3 *struct{ Text string `json:"text"`; Img string `json:"img,omitempty"` } `json:"row3"`
+        Row4 *struct{ Text string `json:"text"`; Img string `json:"img,omitempty"` } `json:"row4"`
     }
     if err := json.NewDecoder(r.Body).Decode(&req); err != nil { respondJSON(w, map[string]interface{}{"error": err.Error()}); return }
-
     payload := map[string]interface{}{"type": "strs", "version": 1, "datetime": time.Now().Unix(), "pattern": req.Pattern, "is_day": req.IsDay}
     if req.Row1 != nil { payload["str1"] = req.Row1 }
     if req.Row2 != nil { payload["str2"] = req.Row2 }
     if req.Row3 != nil { payload["str3"] = req.Row3 }
     if req.Row4 != nil { payload["str4"] = req.Row4 }
-
     payloadJSON, _ := json.Marshal(payload)
     url := fmt.Sprintf("http://%s:%d/places", req.IP, req.Port)
     client := &http.Client{Timeout: 5 * time.Second}
     startTime := time.Now()
     httpReq, _ := http.NewRequest("POST", url, strings.NewReader(string(payloadJSON)))
-    httpReq.Header.Set("Content-Type", "application/json")
-    httpReq.Header.Set("Connection", "close")
+    httpReq.Header.Set("Content-Type", "application/json"); httpReq.Header.Set("Connection", "close")
     resp, err := client.Do(httpReq)
     elapsed := time.Since(startTime)
-
     result := map[string]interface{}{"url": url, "payload": string(payloadJSON), "elapsed_ms": elapsed.Milliseconds(), "success": err == nil && resp != nil && resp.StatusCode == 200}
-    if err != nil { result["error"] = err.Error() } else {
-        result["status"] = resp.StatusCode
-        body, _ := io.ReadAll(resp.Body)
-        resp.Body.Close()
-        result["response"] = string(body)
-    }
+    if err != nil { result["error"] = err.Error() } else { result["status"] = resp.StatusCode; body, _ := io.ReadAll(resp.Body); resp.Body.Close(); result["response"] = string(body) }
     respondJSON(w, result)
 }
 
@@ -1699,7 +1629,6 @@ func (ws *WebServer) handleSaveConfig(w http.ResponseWriter, r *http.Request) {
     var newCfg Config
     if err := json.NewDecoder(r.Body).Decode(&newCfg); err != nil { respondJSON(w, map[string]interface{}{"error": "Invalid JSON: " + err.Error()}); return }
     if err := newCfg.Validate(); err != nil { respondJSON(w, map[string]interface{}{"error": "Validation: " + err.Error()}); return }
-
     data, err := json.MarshalIndent(newCfg, "", "  ")
     if err != nil { respondJSON(w, map[string]interface{}{"error": "Marshal: " + err.Error()}); return }
     if err := os.WriteFile(ws.cfgPath, data, 0644); err != nil { respondJSON(w, map[string]interface{}{"error": "Write: " + err.Error()}); return }
@@ -1708,61 +1637,44 @@ func (ws *WebServer) handleSaveConfig(w http.ResponseWriter, r *http.Request) {
         time.Sleep(1 * time.Second)
         cfg := Get()
         if cfg == nil { log.Error().Msg("Config not loaded after save"); return }
-
         f := NewMPGSFetcher(cfg.MPGS.BaseURL, cfg.MPGS.Key, cfg.MPGS.Secret, cfg.MPGS.Version, cfg.MPGS.Timeout)
         ctx, cancel := context.WithTimeout(context.Background(), time.Duration(cfg.MPGS.Timeout)*time.Second)
         defer cancel()
         spaces, err := f.Fetch(ctx)
         if err != nil { log.Error().Err(err).Msg("MPGS fetch after config save failed"); return }
         log.Info().Int("spaces", len(spaces)).Msg("MPGS fetched after config save, sending to tables...")
-
-        zoneFree := make(map[string]int)
-        floorFree := make(map[string]int)
+        zoneFree := make(map[string]int); floorFree := make(map[string]int)
         for _, s := range spaces {
             if s.ParkingSpaceStatus == 0 {
-                zone := s.BelongArea; if zone == "" { zone = "unknown" }
-                zoneFree[zone]++
-                floor := s.MapName; if floor == "" { floor = "unknown" }
-                floorFree[floor]++
+                zone := s.BelongArea; if zone == "" { zone = "unknown" }; zoneFree[zone]++
+                floor := s.MapName; if floor == "" { floor = "unknown" }; floorFree[floor]++
             }
         }
-
         for _, table := range cfg.Tables {
             if table.Mode != "push" { continue }
             maxRows := getMaxRows(table.Pattern)
-            payload := map[string]interface{}{"type": "strs", "version": 1, "datetime": time.Now().Unix(), "pattern": table.Pattern, "is_day": isDaytime()}
-
+            payload := map[string]interface{}{"type": "strs", "version": 1, "datetime": time.Now().Unix(), "pattern": table.Pattern, "is_day": getTableDaytime(table)}
             if table.Row1 != nil && maxRows >= 1 && (len(table.Row1.Zones) > 0 || len(table.Row1.Floors) > 0) {
                 cnt := countFreeSpaces(zoneFree, floorFree, table.Row1.Zones, table.Row1.Floors)
-                row := map[string]string{"text": fmt.Sprintf("%d", cnt)}
-                if table.Row1.Img != "" { row["img"] = table.Row1.Img }
-                payload["str1"] = row
+                row := map[string]string{"text": fmt.Sprintf("%d", cnt)}; if table.Row1.Img != "" { row["img"] = table.Row1.Img }; payload["str1"] = row
             }
             if table.Row2 != nil && maxRows >= 2 && (len(table.Row2.Zones) > 0 || len(table.Row2.Floors) > 0) {
                 cnt := countFreeSpaces(zoneFree, floorFree, table.Row2.Zones, table.Row2.Floors)
-                row := map[string]string{"text": fmt.Sprintf("%d", cnt)}
-                if table.Row2.Img != "" { row["img"] = table.Row2.Img }
-                payload["str2"] = row
+                row := map[string]string{"text": fmt.Sprintf("%d", cnt)}; if table.Row2.Img != "" { row["img"] = table.Row2.Img }; payload["str2"] = row
             }
             if table.Row3 != nil && maxRows >= 3 && (len(table.Row3.Zones) > 0 || len(table.Row3.Floors) > 0) {
                 cnt := countFreeSpaces(zoneFree, floorFree, table.Row3.Zones, table.Row3.Floors)
-                row := map[string]string{"text": fmt.Sprintf("%d", cnt)}
-                if table.Row3.Img != "" { row["img"] = table.Row3.Img }
-                payload["str3"] = row
+                row := map[string]string{"text": fmt.Sprintf("%d", cnt)}; if table.Row3.Img != "" { row["img"] = table.Row3.Img }; payload["str3"] = row
             }
             if table.Row4 != nil && maxRows >= 4 && (len(table.Row4.Zones) > 0 || len(table.Row4.Floors) > 0) {
                 cnt := countFreeSpaces(zoneFree, floorFree, table.Row4.Zones, table.Row4.Floors)
-                row := map[string]string{"text": fmt.Sprintf("%d", cnt)}
-                if table.Row4.Img != "" { row["img"] = table.Row4.Img }
-                payload["str4"] = row
+                row := map[string]string{"text": fmt.Sprintf("%d", cnt)}; if table.Row4.Img != "" { row["img"] = table.Row4.Img }; payload["str4"] = row
             }
-
             payloadJSON, _ := json.Marshal(payload)
             url := fmt.Sprintf("http://%s:%d/places", table.IP, table.Port)
             client := &http.Client{Timeout: 5 * time.Second}
             httpReq, _ := http.NewRequest("POST", url, strings.NewReader(string(payloadJSON)))
-            httpReq.Header.Set("Content-Type", "application/json")
-            httpReq.Header.Set("Connection", "close")
+            httpReq.Header.Set("Content-Type", "application/json"); httpReq.Header.Set("Connection", "close")
             resp, err := client.Do(httpReq)
             if err != nil { log.Error().Err(err).Str("ip", table.IP).Msg("Send after config save failed") } else {
                 body, _ := io.ReadAll(resp.Body); resp.Body.Close()
@@ -1770,7 +1682,6 @@ func (ws *WebServer) handleSaveConfig(w http.ResponseWriter, r *http.Request) {
             }
         }
     }()
-
     respondJSON(w, map[string]interface{}{"success": true, "message": "Config saved. MPGS fetch and table update triggered."})
 }
 
@@ -1780,12 +1691,11 @@ func respondJSON(w http.ResponseWriter, data interface{}) {
 }
 WEBEOF
     print_success "web.go создан"
-
     print_success "Все файлы проекта созданы"
 }
 
 ###############################################################################
-# Шаг 7-12 (без изменений)
+# Шаг 7: Сборка проекта
 ###############################################################################
 
 build_project() {
@@ -1809,6 +1719,10 @@ build_project() {
     print_success "Скомпилирован: $PROJECT_DIR/$SERVICE_NAME ($(ls -lh $PROJECT_DIR/$SERVICE_NAME | awk '{print $5}'))"
 }
 
+###############################################################################
+# Шаг 8: Создание конфигурации
+###############################################################################
+
 create_config() {
     print_step "Создание конфигурации"
     cat > "$CONFIG_DIR/config.json" << EOF
@@ -1818,7 +1732,7 @@ create_config() {
   "log_level": "debug",
   "sunrise_hour": 7,
   "sunset_hour": 18,
-  "tables": [{ "ip": "${TABLE1_IP}", "port": ${TABLE1_PORT}, "mode": "push", "pattern": 0,
+  "tables": [{ "ip": "${TABLE1_IP}", "port": ${TABLE1_PORT}, "mode": "push", "pattern": 0, "day_mode": "auto",
     "row1": {"text": "", "img": "", "zones": [], "floors": []},
     "row2": {"text": "", "img": "", "zones": [], "floors": []},
     "row3": {"text": "", "img": "", "zones": [], "floors": []},
@@ -1828,6 +1742,10 @@ create_config() {
 EOF
     print_success "Конфигурация создана: $CONFIG_DIR/config.json"
 }
+
+###############################################################################
+# Шаг 9: Создание systemd-сервиса
+###############################################################################
 
 create_service() {
     print_step "Создание systemd-сервиса"
@@ -1853,6 +1771,10 @@ EOF
     print_success "Сервис создан"
 }
 
+###############################################################################
+# Шаг 10: Проверка файрвола
+###############################################################################
+
 check_firewall() {
     print_step "Проверка файрвола"
     if systemctl is-active --quiet firewalld 2>/dev/null; then
@@ -1864,6 +1786,10 @@ check_firewall() {
         print_info "Файрвол не активен"
     fi
 }
+
+###############################################################################
+# Шаг 11: Запуск сервиса
+###############################################################################
 
 start_service() {
     print_step "Запуск сервиса"
@@ -1883,6 +1809,9 @@ start_service() {
     fi
 }
 
+###############################################################################
+# Финальный вывод
+###############################################################################
 
 show_summary() {
     echo ""
@@ -1910,11 +1839,15 @@ show_summary() {
     journalctl -u "$SERVICE_NAME" -n 10 --no-pager
 }
 
+###############################################################################
+# Главная функция
+###############################################################################
+
 main() {
     clear
     echo ""
     echo "============================================="
-    echo "  RPS for Yandex Installation Script v5.1.1"
+    echo "  RPS for Yandex Installation Script v5.2.0"
     echo "============================================="
     echo ""
     mkdir -p "$PROJECT_DIR"

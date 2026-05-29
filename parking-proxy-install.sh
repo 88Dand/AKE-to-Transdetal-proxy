@@ -1179,7 +1179,7 @@ func buildIndexHTML(cfg *Config) string {
                 </div>
             </div>`, i, j, displayStyle, j, i, j, i, j, textVal,
                 buildImgSelect(fmt.Sprintf("table_%d_row%d_img", i, j), imgVal, validImgs),
-                i, j, i, j, i, j)
+                i, j, i, j, i, j, i, j)
         }
 
         tablesHTML += fmt.Sprintf(`

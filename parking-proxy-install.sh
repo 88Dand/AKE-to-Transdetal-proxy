@@ -1,7 +1,7 @@
 #!/bin/bash
 ###############################################################################
 # ParkingProxy - Complete Installation Script
-# Версия: 5.1.0
+# Версия: 5.1.1
 # Описание: Автоматическое развёртывание RPS for Yandex
 ###############################################################################
 
@@ -805,7 +805,7 @@ func (p *Processor) Process(data []SpaceInfo, cfg *Config) (map[string]TablePayl
             Type:    "strs",
             Version: 1,
             Pattern: t.Pattern,
-            IsDay:   getTableDaytime(),
+            IsDay:   getTableDaytime(t),
         }
 
         hasAnyRow := false
